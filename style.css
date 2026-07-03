@@ -467,6 +467,18 @@ input{ font-family: var(--font-body); }
   border-bottom-right-radius: 4px;
 }
 
+/* Bubble khusus untuk respons krisis/safety — reuse token warna
+   --peach yang sudah dipakai di .result-crisis supaya tetap
+   konsisten secara visual, tapi cukup beda dari bubble biasa agar
+   terasa "penting" tanpa terlihat menakutkan. */
+.bubble-crisis{
+  align-self: flex-start;
+  background: #FDECE7;
+  border: 1px solid var(--peach);
+  color: #8A4A36;
+  border-bottom-left-radius: 4px;
+}
+
 .chat-input-row{
   display: flex;
   gap: 10px;
