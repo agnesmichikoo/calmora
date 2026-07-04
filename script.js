@@ -96,121 +96,140 @@
   /* ---------------------------------------------------------
      CHATBOT COMPANION ENGINE
      Simulasi berbasis pola kata kunci + variasi respons + memori
-     percakapan ringan, supaya terasa lebih natural (bukan AI
-     sungguhan — lihat catatan di README soal menyambungkan API asli).
+     percakapan ringan, dibuat dengan gaya ngobrol santai kayak
+     ke temen deket (bukan AI sungguhan — lihat catatan soal
+     menyambungkan API asli).
      --------------------------------------------------------- */
 
   // Sapaan pembuka / basa-basi ringan
   const GREETING_PATTERNS = ['halo', 'hai', 'hi', 'hey', 'pagi', 'siang', 'sore', 'malam', 'permisi'];
   const GREETING_RESPONSES = [
-    'Hai juga 🌿 Senang kamu mampir. Lagi ada yang kamu rasakan hari ini, atau cuma pengen ngobrol santai dulu?',
-    'Halo! Aku di sini kok. Gimana harimu sejauh ini?',
-    'Hai, makasih udah mampir. Boleh cerita apa aja yang lagi ada di kepala atau hatimu sekarang.',
+    'Haii 🌿 Gimana kabarnya hari ini?',
+    'Halo juga! Lagi mau cerita apa nih, atau cuma pengen ngobrol santai dulu juga gapapa.',
+    'Hai, seneng deh kamu mampir. Ada apa nih?',
   ];
 
   // Ucapan terima kasih / mau mengakhiri obrolan
   const CLOSING_PATTERNS = ['makasih', 'terima kasih', 'thanks', 'thank you', 'oke deh', 'udah dulu ya', 'segitu aja'];
   const CLOSING_RESPONSES = [
-    'Sama-sama. Aku senang bisa nemenin kamu ngobrol. Pintu ini selalu terbuka kalau kamu mau cerita lagi.',
-    'Dengan senang hati. Jaga diri kamu ya, dan kembali lagi kapan pun kamu butuh teman cerita.',
-    'Terima kasih juga sudah mau terbuka. Sampai ketemu lagi di sini kalau kamu butuh 🌿',
+    'Sama-sama! Seneng bisa nemenin kamu ngobrol. Balik lagi aja kapan-kapan kalau mau cerita lagi ya.',
+    'Santai aja, aku di sini kok kalau kamu butuh. Jaga diri ya 🌿',
+    'Iya, semangat terus ya. Aku ada di sini kalau kamu butuh temen cerita lagi.',
+  ];
+
+  // Balasan super singkat (iya, hmm, oke) yang butuh dorongan lanjutan
+  const SHORT_REPLY_PATTERNS = ['iya', 'ya', 'hmm', 'hm', 'oke', 'ok', 'oh', 'gitu', 'lah', 'terus', 'trus', 'nggak tau', 'ga tau', 'gatau', 'biasa aja', 'gapapa', 'gak papa'];
+  const SHORT_REPLY_RESPONSES = [
+    'Terus gimana?',
+    'Cerita dong, aku dengerin kok.',
+    'Nah, lanjutin aja, aku masih di sini.',
+    'Hmm oke, ada lagi yang mau kamu ceritain?',
+    'Boleh diperjelas dikit lagi? Aku pengen ngerti lebih dalem.',
+  ];
+
+  // Pengen cerita / curhat tapi belum masuk topik spesifik
+  const INVITATION_PATTERNS = ['mau cerita', 'pengen cerita', 'boleh cerita', 'mau curhat', 'pengen curhat', 'aku mau', 'ada yang mau aku ceritain', 'belum cerita'];
+  const INVITATION_RESPONSES = [
+    'Boleh banget. Cerita aja pelan-pelan, nggak perlu buru-buru, aku dengerin sampai selesai.',
+    'Aku siap dengerin. Mau mulai dari mana aja gapapa kok.',
+    'Silakan, aku di sini kok, nggak akan motong ceritamu.',
   ];
 
   // Kategori emosi: tiap kategori punya beberapa variasi validasi + saran,
-  // dan beberapa pertanyaan lanjutan yang open-ended.
+  // dan beberapa pertanyaan lanjutan yang open-ended, gaya santai.
   const EMOTION_CATEGORIES = [
     {
       name: 'cemas',
       keywords: ['cemas', 'khawatir', 'anxious', 'panik', 'gelisah', 'was-was', 'waswas', 'deg-degan'],
       responses: [
-        'Rasa cemas itu berat ya, dan wajar banget buat dirasain. Kalau kamu mau, coba tarik napas perlahan 4 detik, tahan 4 detik, lalu buang perlahan 4 detik — kita bisa coba bareng.',
-        'Aku dengar kamu lagi cemas. Kadang pikiran jadi lompat-lompat kalau lagi kayak gini, dan itu nggak apa-apa.',
-        'Cemas biasanya muncul kalau ada sesuatu yang terasa nggak pasti. Boleh cerita, ada hal spesifik yang bikin kamu merasa begini?',
+        'Duh, cemas emang nggak enak banget ya. Coba deh tarik napas pelan-pelan, 4 detik tarik, tahan 4 detik, buang 4 detik. Yuk kita coba bareng.',
+        'Wajar kok ngerasa cemas gitu. Kadang pikiran emang suka lompat-lompat kalau lagi kayak gini.',
+        'Cemas biasanya muncul kalau ada yang berasa nggak pasti nih. Ada hal spesifik yang bikin kamu gini?',
       ],
       followups: [
-        'Kira-kira sejak kapan perasaan ini mulai muncul?',
-        'Ada hal spesifik yang bikin kamu ngerasa begini, atau lebih ke perasaan umum aja?',
-        'Kalau boleh tau, biasanya apa yang bikin kamu ngerasa sedikit lebih tenang?',
+        'Ini mulai kerasa dari kapan sih?',
+        'Ada penyebab spesifiknya, atau cuma perasaan umum aja?',
+        'Biasanya apa sih yang bikin kamu agak tenangan?',
       ],
     },
     {
       name: 'sedih',
       keywords: ['sedih', 'kecewa', 'nangis', 'menangis', 'hampa', 'kosong', 'patah hati', 'galau'],
       responses: [
-        'Aku dengar kamu sedang sedih. Nggak apa-apa untuk merasakannya sepenuhnya, nggak perlu buru-buru baik-baik aja.',
-        'Kedengarannya ini berat buat kamu. Aku di sini, ceritakan aja sepelan atau sebanyak yang kamu mau.',
-        'Sedih itu bagian yang wajar dari hidup, walau nggak pernah terasa ringan pas ngalamin. Terima kasih udah mau cerita ke aku.',
+        'Duh, aku ikut sedih dengernya. Gapapa kok kalau mau sedih dulu, nggak usah maksa baik-baik aja.',
+        'Kedengerannya ini berat banget ya buat kamu. Cerita aja pelan-pelan, aku dengerin.',
+        'Sedih emang bagian dari hidup sih, walau tetep aja nggak enak ngerasainnya. Makasih udah mau cerita ke aku.',
       ],
       followups: [
-        'Ada kejadian tertentu yang bikin kamu ngerasa sesedih ini?',
-        'Apa udah ada orang lain yang tahu perasaanmu ini?',
-        'Kira-kira apa yang paling kamu butuhkan sekarang — didengerin, dialihin, atau saran?',
+        'Ada kejadian tertentu yang bikin kamu sesedih ini?',
+        'Udah ada yang tau perasaan kamu ini selain aku?',
+        'Kamu butuhnya didengerin aja, dialihin, apa mau dikasih saran nih?',
       ],
     },
     {
       name: 'capek',
       keywords: ['capek', 'lelah', 'cape', 'penat', 'burnout', 'kecapean', 'ngantuk banget'],
       responses: [
-        'Kedengarannya kamu udah kerja keras banget belakangan ini. Kamu boleh kok istirahat, bahkan cuma 10 menit tanpa layar bisa bantu banget.',
-        'Capek fisik dan capek pikiran itu beda tapi sama-sama valid buat diakui. Sudah berapa lama kamu ngerasa kayak gini?',
-        'Aku dengar kamu lelah. Kadang tubuh dan pikiran kita butuh dikasih jeda dulu sebelum lanjut lagi.',
+        'Kayaknya kamu udah kerja keras banget belakangan ya. Istirahat dulu gapapa kok, 10 menit tanpa layar aja udah lumayan banget.',
+        'Capek fisik sama capek pikiran itu beda tapi sama-sama valid buat diakuin. Udah berapa lama nih ngerasa gini?',
+        'Duh, capek ya. Kadang badan sama otak emang butuh jeda dulu sebelum lanjut lagi.',
       ],
       followups: [
-        'Kira-kira apa yang paling menguras energi kamu belakangan ini?',
-        'Kapan terakhir kali kamu benar-benar istirahat tanpa mikirin hal lain?',
-        'Ada waktu buat kamu istirahat sebentar hari ini?',
+        'Kira-kira apa yang paling nguras energi kamu belakangan ini?',
+        'Kapan terakhir kali bener-bener istirahat tanpa mikirin apa-apa?',
+        'Ada waktu buat istirahat bentar hari ini?',
       ],
     },
     {
       name: 'takut',
       keywords: ['takut', 'ngeri', 'serem', 'phobia', 'trauma'],
       responses: [
-        'Rasa takut itu berat, dan aku menghargai kamu mau cerita soal ini. Coba teknik grounding: sebutkan 5 benda yang kamu lihat, 4 yang bisa kamu sentuh, 3 yang bisa kamu dengar sekarang.',
-        'Aku dengar kamu lagi takut. Kamu nggak sendirian ngerasain ini, dan boleh banget pelan-pelan aja ceritanya.',
-        'Ketakutan sering muncul buat ngelindungin kita dari sesuatu. Boleh cerita, ini soal hal yang udah terjadi atau yang mungkin terjadi?',
+        'Takut itu emang berat ya, makasih udah mau cerita. Coba deh sebutin 5 benda yang kamu liat, 4 yang bisa disentuh, 3 yang bisa didenger sekarang.',
+        'Aku denger kamu lagi takut. Kamu nggak sendirian kok ngerasain ini, pelan-pelan aja ceritanya.',
+        'Rasa takut biasanya muncul buat ngelindungin kita. Ini soal yang udah kejadian, atau yang mungkin bakal kejadian?',
       ],
       followups: [
-        'Apa yang bikin kamu ngerasa paling takut dari situasi ini?',
-        'Ada seseorang yang bisa kamu ajak bicara soal ini juga?',
-        'Kira-kira hal kecil apa yang bisa bikin kamu ngerasa sedikit lebih aman sekarang?',
+        'Apa yang paling bikin kamu takut dari situasi ini?',
+        'Ada orang yang bisa kamu ajak ngobrol soal ini juga?',
+        'Kira-kira hal kecil apa yang bisa bikin kamu ngerasa agak aman sekarang?',
       ],
     },
     {
       name: 'marah',
       keywords: ['marah', 'kesal', 'jengkel', 'emosi', 'bete', 'sebel'],
       responses: [
-        'Kedengarannya kamu lagi kesal banget. Wajar kok marah, itu tanda ada sesuatu yang penting buat kamu yang terasa dilanggar.',
-        'Aku dengar kamu marah. Boleh cerita apa yang bikin kamu ngerasa begini?',
-        'Rasa marah itu sering nyimpen pesan penting di baliknya. Pelan-pelan aja ceritain kalau kamu mau.',
+        'Wah, kedengerannya kamu kesel banget ya. Wajar kok marah, biasanya itu tanda ada hal penting yang berasa dilanggar.',
+        'Aku denger kamu lagi marah nih. Cerita dong, apa yang bikin gini?',
+        'Marah tuh sering nyimpen pesan penting di baliknya. Pelan-pelan aja ceritain kalau mau.',
       ],
       followups: [
-        'Apa yang jadi pemicu utama perasaan ini?',
-        'Udah sempat kamu sampaikan perasaan ini ke orang yang terlibat?',
-        'Biasanya apa yang bantu kamu buat lebih tenang saat marah?',
+        'Apa sih pemicu utamanya?',
+        'Udah sempet kamu omongin perasaan ini ke orangnya?',
+        'Biasanya apa yang bikin kamu agak tenangan kalau lagi marah?',
       ],
     },
     {
       name: 'kesepian',
       keywords: ['kesepian', 'sendirian', 'sendiri banget', 'nggak ada teman', 'ga ada temen'],
       responses: [
-        'Rasa kesepian itu berat, dan aku senang kamu memilih cerita ke sini. Kamu nggak benar-benar sendirian sekarang.',
-        'Aku dengar kamu ngerasa sendirian. Perasaan itu valid, meskipun kadang susah dijelasin ke orang lain.',
+        'Duh, kesepian emang berat ya. Seneng deh kamu mau cerita ke sini, at least sekarang kamu nggak sendirian.',
+        'Aku denger kamu ngerasa sendirian. Itu valid banget kok, walau kadang susah dijelasin ke orang lain.',
       ],
       followups: [
-        'Ada orang yang biasanya bikin kamu ngerasa terhubung, meski cuma sedikit?',
-        'Sejak kapan perasaan ini mulai terasa lebih berat?',
+        'Ada orang yang biasanya bikin kamu ngerasa terhubung dikit, siapa pun itu?',
+        'Ini mulai kerasa berat sejak kapan?',
       ],
     },
     {
       name: 'senang',
       keywords: ['senang', 'bahagia', 'happy', 'seru', 'bersyukur', 'excited', 'lega'],
       responses: [
-        'Wah, senang dengarnya! Aku ikut senang buat kamu. Mau cerita apa yang bikin harimu jadi begini?',
-        'Itu kabar baik. Momen-momen kayak gini layak banget dirayain, sekecil apa pun.',
-        'Aku suka dengar ini. Semoga perasaan baik ini bisa bertahan lebih lama ya.',
+        'Wah asik banget! Aku ikut seneng dengernya. Cerita dong apa yang bikin harimu jadi bagus gini?',
+        'Itu kabar bagus tuh. Momen kayak gini layak dirayain, sekecil apa pun itu.',
+        'Suka deh denger ini. Semoga mood baiknya bisa awet ya.',
       ],
       followups: [
-        'Apa hal yang paling bikin kamu ngerasa begini hari ini?',
+        'Apa nih yang paling bikin kamu ngerasa gini hari ini?',
         'Ada rencana buat rayain momen ini?',
       ],
     },
@@ -219,17 +238,18 @@
   // Fallback reflektif kalau tidak ada kata kunci yang cocok —
   // dipecah jadi dua bagian lalu dikombinasikan biar variasinya banyak.
   const REFLECTIVE_OPENERS = [
-    'Aku dengar apa yang kamu ceritain.',
-    'Makasih udah mau terbuka soal ini.',
-    'Kedengarannya ini cukup berarti buat kamu.',
-    'Aku menghargai kamu mau berbagi cerita ini.',
-    'Terima kasih sudah percaya cerita ini ke aku.',
+    'Oke, aku denger ceritamu.',
+    'Makasih udah mau cerita ini.',
+    'Kedengerannya ini penting banget buat kamu.',
+    'Aku appreciate banget kamu mau share ini.',
+    'Wah, makasih udah percaya cerita ini ke aku.',
   ];
   const REFLECTIVE_QUESTIONS = [
-    'Mau cerita lebih lanjut soal itu?',
+    'Mau lanjut cerita lebih detail?',
     'Kira-kira gimana perasaanmu soal itu sekarang?',
-    'Ada bagian dari itu yang paling berat buat kamu?',
-    'Apa yang biasanya bantu kamu ngerasa lebih baik dalam situasi kayak gini?',
+    'Ada bagian yang paling berat dari itu?',
+    'Biasanya apa sih yang bikin kamu ngerasa mendingan kalau kayak gini?',
+    'Cerita aja lebih lanjut, aku dengerin kok.',
     'Boleh diceritain lebih detail, aku dengerin kok.',
   ];
 
@@ -481,6 +501,16 @@
     bubble.textContent = text;
     chatWindow.appendChild(bubble);
     chatWindow.scrollTop = chatWindow.scrollHeight;
+    return bubble;
+  }
+
+  function showTypingIndicator() {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble bubble-bot bubble-typing';
+    bubble.innerHTML = '<span></span><span></span><span></span>';
+    chatWindow.appendChild(bubble);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return bubble;
   }
 
   function greetIfNeeded() {
@@ -492,15 +522,33 @@
     );
   }
 
-  function pickVariant(arr, avoid) {
-    if (arr.length === 1) return arr[0];
-    let choice = arr[Math.floor(Math.random() * arr.length)];
-    let attempts = 0;
-    while (choice === avoid && attempts < 5) {
-      choice = arr[Math.floor(Math.random() * arr.length)];
-      attempts++;
+  // Sistem "bag": ambil dari kantung yang sudah diacak sampai habis,
+  // baru diacak ulang. Ini bikin variasi kalimat nggak berulang terus-menerus
+  // selama variannya belum habis dipakai semua.
+  const responseBags = new Map();
+
+  function shuffle(arr) {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
     }
-    return choice;
+    return copy;
+  }
+
+  function pickFromBag(arr) {
+    if (!arr || arr.length === 0) return '';
+    if (arr.length === 1) return arr[0];
+    let bag = responseBags.get(arr);
+    if (!bag || bag.length === 0) {
+      bag = shuffle(arr);
+      responseBags.set(arr, bag);
+    }
+    return bag.pop();
+  }
+
+  function matchesAny(text, patterns) {
+    return patterns.some((kw) => text === kw || text.includes(kw));
   }
 
   function matchEmotionCategory(text) {
@@ -516,44 +564,54 @@
 
     // 1. Sapaan
     if (GREETING_PATTERNS.some((kw) => text === kw || text.startsWith(kw + ' ') || text.startsWith(kw + ','))) {
-      const reply = pickVariant(GREETING_RESPONSES, chatMemory.lastResponse);
-      chatMemory.lastResponse = reply;
+      const reply = pickFromBag(GREETING_RESPONSES);
       chatMemory.lastTopic = 'greeting';
       return reply;
     }
 
     // 2. Penutup / ucapan terima kasih
-    if (CLOSING_PATTERNS.some((kw) => text.includes(kw))) {
-      const reply = pickVariant(CLOSING_RESPONSES, chatMemory.lastResponse);
-      chatMemory.lastResponse = reply;
+    if (matchesAny(text, CLOSING_PATTERNS)) {
+      const reply = pickFromBag(CLOSING_RESPONSES);
       chatMemory.lastTopic = 'closing';
       return reply;
     }
 
-    // 3. Kategori emosi yang cocok
+    // 3. Ajakan mau cerita/curhat tapi belum spesifik
+    if (matchesAny(text, INVITATION_PATTERNS)) {
+      const reply = pickFromBag(INVITATION_RESPONSES);
+      chatMemory.lastTopic = 'invitation';
+      return reply;
+    }
+
+    // 4. Kategori emosi yang cocok
     const category = matchEmotionCategory(text);
     if (category) {
-      // Kalau topik sama dengan pesan sebelumnya, condong ke pertanyaan lanjutan
-      // supaya obrolan terasa berkembang, bukan mengulang validasi yang sama.
       const sameTopicAsBefore = chatMemory.lastTopic === category.name;
       let reply;
       if (sameTopicAsBefore && Math.random() < 0.6) {
-        reply = pickVariant(category.followups, chatMemory.lastResponse);
+        reply = pickFromBag(category.followups);
       } else {
-        const base = pickVariant(category.responses, chatMemory.lastResponse);
-        const addFollowup = category.followups && Math.random() < 0.5;
-        reply = addFollowup ? `${base} ${pickVariant(category.followups)}` : base;
+        const base = pickFromBag(category.responses);
+        const addFollowup = category.followups && Math.random() < 0.45;
+        reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
       }
-      chatMemory.lastResponse = reply;
       chatMemory.lastTopic = category.name;
       return reply;
     }
 
-    // 4. Fallback reflektif (tidak ada kata kunci yang cocok)
-    const opener = pickVariant(REFLECTIVE_OPENERS, chatMemory.lastResponse);
-    const question = pickVariant(REFLECTIVE_QUESTIONS);
+    // 5. Balasan super singkat (iya, hmm, oke, dsb) — hanya dianggap "singkat"
+    // kalau memang pendek, supaya kalimat panjang tetap masuk fallback reflektif.
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+    if (wordCount <= 3 && matchesAny(text, SHORT_REPLY_PATTERNS)) {
+      const reply = pickFromBag(SHORT_REPLY_RESPONSES);
+      chatMemory.lastTopic = 'short';
+      return reply;
+    }
+
+    // 6. Fallback reflektif (tidak ada pola yang cocok sama sekali)
+    const opener = pickFromBag(REFLECTIVE_OPENERS);
+    const question = pickFromBag(REFLECTIVE_QUESTIONS);
     const reply = `${opener} ${question}`;
-    chatMemory.lastResponse = reply;
     chatMemory.lastTopic = 'general';
     return reply;
   }
@@ -566,9 +624,13 @@
     addBubble(value, 'user');
     chatInput.value = '';
 
+    const typingBubble = showTypingIndicator();
+    const thinkTime = 500 + Math.random() * 500;
+
     setTimeout(() => {
+      typingBubble.remove();
       addBubble(getBotResponse(value), 'bot');
-    }, 450);
+    }, thinkTime);
   });
 
   // Greet the first time the chat page becomes visible
