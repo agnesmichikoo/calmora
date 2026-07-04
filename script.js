@@ -253,6 +253,30 @@
     'Boleh diceritain lebih detail, aku dengerin kok.',
   ];
 
+  // Kata-kata fungsi yang diabaikan saat menangkap "topik" dari kalimat user,
+  // supaya kata yang tersisa lebih mungkin berupa hal spesifik yang diceritakan
+  // (misal: "kerjaan", "ujian", "pacar", "keluarga") bukan kata sambung/ganti.
+  const STOPWORDS = [
+    'yang', 'di', 'ke', 'dari', 'dan', 'atau', 'aku', 'kamu', 'ini', 'itu', 'saya', 'dia',
+    'mereka', 'kita', 'ada', 'juga', 'sudah', 'udah', 'belum', 'akan', 'sedang', 'lagi',
+    'banget', 'sih', 'deh', 'dong', 'nih', 'kok', 'ya', 'gak', 'ga', 'nggak', 'enggak',
+    'tidak', 'bukan', 'karena', 'kalau', 'kalo', 'tapi', 'tetapi', 'sama', 'dengan', 'untuk',
+    'buat', 'biar', 'supaya', 'jadi', 'terus', 'trus', 'aja', 'saja', 'mau', 'pengen',
+    'harus', 'bisa', 'dapat', 'masih', 'sekarang', 'hari', 'tuh', 'gitu', 'gini', 'sangat',
+    'lebih', 'paling', 'pun', 'pada', 'oleh', 'saat', 'waktu', 'ketika', 'begitu', 'begini',
+    'satu', 'dua', 'tiga', 'orang', 'nya', 'ku', 'mu', 'apa', 'gimana', 'kenapa', 'akhir',
+  ];
+
+  // Template respons yang menyisipkan kembali "topik" dari kalimat user,
+  // supaya kelihatan lebih nyambung ke isi cerita, bukan cuma template kosong.
+  const TOPIC_OPENERS = [
+    'Soal {topic} ini kedengarannya lumayan berat ya buat kamu.',
+    'Aku denger kamu lagi mikirin {topic}.',
+    'Hmm, {topic} ya. Kedengarannya ini beneran ngefek ke kamu.',
+    'Makasih udah cerita soal {topic} ke aku.',
+    'Jadi ini soal {topic} ya. Aku dengerin kok.',
+  ];
+
   /* ---------------------------------------------------------
      DOM HELPERS
      --------------------------------------------------------- */
@@ -558,6 +582,32 @@
     return null;
   }
 
+  // Ambil kata-kata "isi" dari kalimat user (bukan kata sambung/kata kunci
+  // emosi yang sudah ditangani terpisah), buat disisipkan balik ke jawaban
+  // supaya bot kelihatan menyimak isi cerita, bukan cuma pola generik.
+  const ALL_KNOWN_PATTERNS = [
+    ...EMOTION_CATEGORIES.flatMap((c) => c.keywords),
+    ...GREETING_PATTERNS,
+    ...SHORT_REPLY_PATTERNS,
+    ...CLOSING_PATTERNS,
+    ...INVITATION_PATTERNS,
+  ];
+
+  function extractTopic(text) {
+    const words = text
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const contentWords = words.filter((w) => {
+      const lw = w.toLowerCase();
+      return lw.length >= 3 && !STOPWORDS.includes(lw) && !ALL_KNOWN_PATTERNS.includes(lw);
+    });
+
+    if (contentWords.length === 0) return null;
+    return contentWords.slice(0, 3).join(' ');
+  }
+
   function getBotResponse(userTextRaw) {
     const text = userTextRaw.toLowerCase().trim();
     chatMemory.turnCount++;
@@ -587,13 +637,18 @@
     const category = matchEmotionCategory(text);
     if (category) {
       const sameTopicAsBefore = chatMemory.lastTopic === category.name;
+      const topic = extractTopic(text);
       let reply;
       if (sameTopicAsBefore && Math.random() < 0.6) {
         reply = pickFromBag(category.followups);
       } else {
         const base = pickFromBag(category.responses);
-        const addFollowup = category.followups && Math.random() < 0.45;
-        reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
+        if (topic && Math.random() < 0.4) {
+          reply = `${base} Kalau boleh tau, ini soal ${topic}, ya?`;
+        } else {
+          const addFollowup = category.followups && Math.random() < 0.45;
+          reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
+        }
       }
       chatMemory.lastTopic = category.name;
       return reply;
@@ -608,10 +663,19 @@
       return reply;
     }
 
-    // 6. Fallback reflektif (tidak ada pola yang cocok sama sekali)
-    const opener = pickFromBag(REFLECTIVE_OPENERS);
+    // 6. Fallback reflektif (tidak ada pola yang cocok sama sekali).
+    // Kalau ada kata "isi" yang bisa ditangkap dari kalimat user, sisipkan
+    // balik ke jawaban supaya kelihatan menyesuaikan cerita, bukan generik.
+    const topic = extractTopic(text);
     const question = pickFromBag(REFLECTIVE_QUESTIONS);
-    const reply = `${opener} ${question}`;
+    let reply;
+    if (topic) {
+      const template = pickFromBag(TOPIC_OPENERS);
+      reply = `${template.replace('{topic}', topic)} ${question}`;
+    } else {
+      const opener = pickFromBag(REFLECTIVE_OPENERS);
+      reply = `${opener} ${question}`;
+    }
     chatMemory.lastTopic = 'general';
     return reply;
   }
