@@ -337,31 +337,72 @@
      DASHBOARD
      --------------------------------------------------------- */
 
-  // Deteksi ketidaksesuaian antara mood yang dipilih user dan hasil skor
-  // screening — misalnya user pilih mood "Senang" tapi skornya moderate/severe.
-  // Ini penting supaya dashboard tidak menyesatkan (mood positif ditampilkan
-  // begitu saja padahal skor kecemasannya tinggi).
-  function getMismatchNote(mood, categoryName) {
-    const positiveMoods = ['Senang', 'Baik'];
-    const negativeMoods = ['Sedih', 'Cemas', 'Lelah'];
-    const concerningCategories = ['Moderate anxiety', 'Severe anxiety'];
+  // Setiap kombinasi mood + kategori hasil screening dapat penjelasan
+  // kontekstualnya sendiri — bukan cuma ditampilkan saat nggak sejalan,
+  // tapi selalu ada catatan yang relevan di dashboard.
+  const CONCERN_LEVEL_WORDS = {
+    'Minimal anxiety': 'rendah',
+    'Mild anxiety': 'ringan',
+    'Moderate anxiety': 'sedang',
+    'Severe anxiety': 'berat',
+  };
 
-    if (positiveMoods.includes(mood) && concerningCategories.includes(categoryName)) {
-      const levelWord = categoryName === 'Severe anxiety' ? 'berat' : 'sedang';
+  function getMoodValence(mood) {
+    if (['Senang', 'Baik'].includes(mood)) return 'positive';
+    if (['Sedih', 'Cemas', 'Lelah'].includes(mood)) return 'negative';
+    return 'neutral';
+  }
+
+  function getConcernLevel(categoryName) {
+    return ['Moderate anxiety', 'Severe anxiety'].includes(categoryName) ? 'high' : 'low';
+  }
+
+  function getMismatchNote(mood, categoryName) {
+    const valence = getMoodValence(mood);
+    const concern = getConcernLevel(categoryName);
+    const levelWord = CONCERN_LEVEL_WORDS[categoryName] || 'tertentu';
+
+    if (valence === 'positive' && concern === 'low') {
       return {
+        tone: 'positive',
+        title: 'Mood dan hasilmu sejalan',
+        text: `Kamu memilih mood "${mood}" dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Sepertinya kondisimu memang cukup stabil hari ini — pertahankan kebiasaan baik yang udah kamu jalani.`,
+      };
+    }
+    if (valence === 'positive' && concern === 'high') {
+      return {
+        tone: 'concern',
         title: 'Sepertinya ada yang tidak sejalan',
         text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Ini bisa saja terjadi — kadang kita tetap terlihat baik-baik saja di luar, walau ada kekhawatiran yang tersimpan di dalam. Nggak apa-apa kalau perasaanmu memang sekompleks ini.`,
       };
     }
-
-    if (negativeMoods.includes(mood) && categoryName === 'Minimal anxiety') {
+    if (valence === 'neutral' && concern === 'low') {
       return {
-        title: 'Sedikit catatan',
-        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat minimal. Perasaan sedih atau lelah nggak selalu berhubungan langsung dengan kecemasan, dan itu wajar.`,
+        tone: 'positive',
+        title: 'Sepertinya cukup stabil',
+        text: `Kamu memilih mood "Biasa" dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Harimu sepertinya berjalan cukup netral dan stabil.`,
       };
     }
-
-    return null;
+    if (valence === 'neutral' && concern === 'high') {
+      return {
+        tone: 'concern',
+        title: 'Ada yang perlu diperhatikan',
+        text: `Kamu memilih mood "Biasa", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Kadang kita nggak selalu sadar penuh sama kekhawatiran yang lagi dirasain. Coba cek rekomendasi self-care di halaman hasil screening ya.`,
+      };
+    }
+    if (valence === 'negative' && concern === 'low') {
+      return {
+        tone: 'neutral',
+        title: 'Sedikit catatan',
+        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Perasaan itu nggak selalu berhubungan langsung dengan kecemasan, dan itu wajar.`,
+      };
+    }
+    // negative && high — mood dan hasil sama-sama menunjukkan ada yang berat
+    return {
+      tone: 'concern',
+      title: 'Hasil ini sejalan dengan perasaanmu',
+      text: `Kamu memilih mood "${mood}", dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Wajar kalau kondisi ini terasa berat — coba lihat rekomendasi self-care di halaman hasil, dan ingat kamu nggak harus menghadapinya sendirian.`,
+    };
   }
 
   function renderDashboard() {
@@ -389,13 +430,10 @@
       $('#ci-category').textContent = data.category;
 
       const mismatch = getMismatchNote(data.mood, data.category);
-      if (mismatch) {
-        $('#mismatch-title').textContent = mismatch.title;
-        $('#mismatch-text').textContent = mismatch.text;
-        mismatchEl.classList.remove('hidden');
-      } else {
-        mismatchEl.classList.add('hidden');
-      }
+      $('#mismatch-title').textContent = mismatch.title;
+      $('#mismatch-text').textContent = mismatch.text;
+      mismatchEl.classList.remove('hidden', 'tone-positive', 'tone-neutral', 'tone-concern');
+      mismatchEl.classList.add(`tone-${mismatch.tone}`);
     } catch (e) {
       emptyEl.classList.remove('hidden');
       filledEl.classList.add('hidden');
