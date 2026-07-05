@@ -267,6 +267,16 @@ input{ font-family: var(--font-body); }
 /* =========================================================
    3. Dashboard
    ========================================================= */
+.calm-illustration{
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 24px;
+  display: block;
+}
+
 .checkin-card{ margin-bottom: 24px; }
 .checkin-empty p{ font-size: 14.5px; }
 
@@ -304,6 +314,26 @@ input{ font-family: var(--font-body); }
 .checkin-sub{ font-size: 12.5px; }
 
 .dashboard-actions{ display: flex; flex-wrap: wrap; gap: 12px; }
+
+.checkin-mismatch{
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: #FBF3E8;
+  border: 1px solid var(--peach);
+  border-radius: var(--radius-sm);
+}
+.mismatch-title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--gray);
+  margin-bottom: 6px;
+}
+.mismatch-text{
+  font-size: 13.5px;
+  margin-bottom: 14px;
+}
+.mismatch-btn{ padding: 10px 20px; font-size: 13.5px; }
 
 /* =========================================================
    4. Mood check-in
@@ -522,6 +552,7 @@ input{ font-family: var(--font-body); }
   .dashboard-actions .btn{ width: 100%; }
   .result-actions{ flex-direction: column; }
   .result-actions .btn{ width: 100%; }
+  .calm-illustration{ max-height: 120px; }
 }
 
 @media (max-width: 380px){
