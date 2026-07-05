@@ -21,7 +21,7 @@
     <div class="nav-links">
       <button class="nav-link active" data-target="dashboard-page">Dashboard</button>
       <button class="nav-link" data-target="mood-page">Check-in</button>
-      <button class="nav-link" data-target="chat-page">Companion</button>
+      <button class="nav-link" data-target="chat-page">Calmora</button>
     </div>
   </div>
 </nav>
@@ -65,6 +65,18 @@
   <!-- ===================== 3. DASHBOARD PAGE ===================== -->
   <section class="page" id="dashboard-page">
     <div class="page-inner">
+      <svg class="calm-illustration" viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="800" height="220" rx="28" fill="#FFFDFB"></rect>
+        <circle cx="650" cy="66" r="42" fill="#F7B7A3" opacity="0.85"></circle>
+        <circle cx="120" cy="55" r="13" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="158" cy="46" r="17" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="198" cy="58" r="11" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="500" cy="40" r="10" fill="#FFFFFF" opacity="0.55"></circle>
+        <circle cx="530" cy="34" r="14" fill="#FFFFFF" opacity="0.55"></circle>
+        <path d="M0 165 Q 150 105 300 155 T 800 145 V220 H0 Z" fill="#BFD7EA" opacity="0.55"></path>
+        <path d="M0 195 Q 200 145 420 185 T 800 175 V220 H0 Z" fill="#A8C3A0" opacity="0.85"></path>
+      </svg>
+
       <header class="page-header">
         <p class="eyebrow">dashboard</p>
         <h2>Halo, senang kamu di sini 🌿</h2>
@@ -91,12 +103,18 @@
               <p class="checkin-sub">dari skor anxiety screening terakhir</p>
             </div>
           </div>
+
+          <div class="checkin-mismatch hidden" id="checkin-mismatch">
+            <p class="mismatch-title" id="mismatch-title">Sepertinya ada yang tidak sejalan</p>
+            <p class="mismatch-text" id="mismatch-text">—</p>
+            <button class="btn btn-secondary mismatch-btn" id="mismatch-chat-btn">Ngobrol dengan Calmora</button>
+          </div>
         </div>
       </div>
 
       <div class="dashboard-actions">
         <button class="btn btn-primary" id="dash-checkin-btn">Mulai Check-in Baru</button>
-        <button class="btn btn-secondary" id="dash-chat-btn">Ngobrol dengan Companion</button>
+        <button class="btn btn-secondary" id="dash-chat-btn">Ngobrol dengan Calmora</button>
       </div>
     </div>
   </section>
@@ -186,7 +204,7 @@
 
       <div class="result-actions">
         <button class="btn btn-primary" id="result-dashboard-btn">Kembali ke Dashboard</button>
-        <button class="btn btn-secondary" id="result-chat-btn">Ngobrol dengan Companion</button>
+        <button class="btn btn-secondary" id="result-chat-btn">Ngobrol dengan Calmora</button>
       </div>
     </div>
   </section>
@@ -195,9 +213,9 @@
   <section class="page" id="chat-page">
     <div class="page-inner narrow">
       <header class="page-header">
-        <p class="eyebrow">companion</p>
+        <p class="eyebrow">calmora</p>
         <h2>Ngobrol Santai</h2>
-        <p class="subtext">Ceritakan saja apa yang kamu rasakan. Aku di sini untuk mendengarkan.</p>
+        <p class="subtext">Ceritakan saja apa yang kamu rasakan ke Calmora, Calmora di sini untuk mendengarkan.</p>
       </header>
 
       <div class="card chat-card">
@@ -207,7 +225,7 @@
           <button type="submit" class="btn btn-primary chat-send-btn">Kirim</button>
         </form>
       </div>
-      <p class="chat-disclaimer">Companion ini adalah simulasi sederhana, bukan terapis sungguhan.</p>
+      <p class="chat-disclaimer">Calmora ini adalah simulasi sederhana, bukan terapis sungguhan.</p>
     </div>
   </section>
 
