@@ -58,7 +58,7 @@
       explanation:
         'Hasil ini menunjukkan gejala kecemasan pada tingkat ringan. Wajar untuk sesekali merasa begini, terutama saat banyak hal terjadi.',
       recommendations: [
-        'Coba latihan pernapasan 4-4-4 selama beberapa menit',
+        'Coba teknik pernapasan kotak (4-4-4-4): tarik napas selama 4 detik, tahan napas 4 detik, embuskan napas perlahan selama 4 detik, lalu tahan lagi 4 detik sebelum menarik napas berikutnya. Ulangi selama beberapa menit',
         'Tuliskan apa yang kamu khawatirkan di jurnal',
         'Kurangi paparan berita atau media yang memicu stres',
       ],
@@ -69,7 +69,7 @@
       explanation:
         'Hasil ini menunjukkan gejala kecemasan pada tingkat sedang. Perasaan ini mungkin mulai terasa cukup mengganggu aktivitasmu.',
       recommendations: [
-        'Coba teknik grounding 5-4-3-2-1 saat kecemasan muncul',
+        'Coba teknik grounding 5-4-3-2-1 saat kecemasan muncul: sebutkan dalam hati 5 benda yang kamu lihat, 4 benda yang bisa kamu sentuh, 3 suara yang kamu dengar, 2 aroma yang bisa kamu cium, dan 1 rasa yang bisa kamu kecap. Teknik ini membantu mengalihkan fokus pikiran ke momen saat ini',
         'Bicarakan perasaanmu dengan orang yang kamu percaya',
         'Beri jeda dari tugas atau tanggung jawab yang menumpuk',
         'Pertimbangkan konsultasi ringan dengan konselor kampus/kantor jika tersedia',
@@ -82,7 +82,7 @@
         'Hasil ini menunjukkan gejala kecemasan pada tingkat yang cukup berat. Penting untuk tidak menghadapi ini sendirian.',
       recommendations: [
         'Hubungi orang terdekat yang kamu percaya untuk bercerita',
-        'Coba teknik pernapasan lambat sambil duduk di tempat yang tenang',
+        'Coba teknik pernapasan kotak (4-4-4-4) sambil duduk di tempat yang tenang: tarik napas 4 detik, tahan 4 detik, buang napas 4 detik, tahan lagi 4 detik, ulangi beberapa kali',
         'Kurangi dulu beban atau keputusan besar dalam waktu dekat',
         'Pertimbangkan menjadwalkan sesi dengan tenaga profesional kesehatan mental',
       ],
@@ -142,7 +142,7 @@
       name: 'cemas',
       keywords: ['cemas', 'khawatir', 'anxious', 'panik', 'gelisah', 'was-was', 'waswas', 'deg-degan'],
       responses: [
-        'Duh, cemas emang nggak enak banget ya. Coba deh tarik napas pelan-pelan, 4 detik tarik, tahan 4 detik, buang 4 detik. Yuk kita coba bareng.',
+        'Duh, cemas emang nggak enak banget ya. Coba deh teknik pernapasan kotak: tarik napas pelan 4 detik, tahan 4 detik, buang napas perlahan 4 detik, terus tahan lagi 4 detik sebelum tarik napas berikutnya. Yuk kita coba bareng, ulangi beberapa kali.',
         'Wajar kok ngerasa cemas gitu. Kadang pikiran emang suka lompat-lompat kalau lagi kayak gini.',
         'Cemas biasanya muncul kalau ada yang berasa nggak pasti nih. Ada hal spesifik yang bikin kamu gini?',
       ],
@@ -184,7 +184,7 @@
       name: 'takut',
       keywords: ['takut', 'ngeri', 'serem', 'phobia', 'trauma'],
       responses: [
-        'Takut itu emang berat ya, makasih udah mau cerita. Coba deh sebutin 5 benda yang kamu liat, 4 yang bisa disentuh, 3 yang bisa didenger sekarang.',
+        'Takut itu emang berat ya, makasih udah mau cerita. Coba deh teknik grounding 5-4-3-2-1: sebutin dalam hati 5 benda yang kamu liat, 4 benda yang bisa disentuh, 3 suara yang kamu denger, 2 aroma yang bisa kamu cium, dan 1 rasa yang bisa kamu kecap. Ini bantu kamu balik fokus ke saat ini.',
         'Aku denger kamu lagi takut. Kamu nggak sendirian kok ngerasain ini, pelan-pelan aja ceritanya.',
         'Rasa takut biasanya muncul buat ngelindungin kita. Ini soal yang udah kejadian, atau yang mungkin bakal kejadian?',
       ],
@@ -336,14 +336,44 @@
   /* ---------------------------------------------------------
      DASHBOARD
      --------------------------------------------------------- */
+
+  // Deteksi ketidaksesuaian antara mood yang dipilih user dan hasil skor
+  // screening — misalnya user pilih mood "Senang" tapi skornya moderate/severe.
+  // Ini penting supaya dashboard tidak menyesatkan (mood positif ditampilkan
+  // begitu saja padahal skor kecemasannya tinggi).
+  function getMismatchNote(mood, categoryName) {
+    const positiveMoods = ['Senang', 'Baik'];
+    const negativeMoods = ['Sedih', 'Cemas', 'Lelah'];
+    const concerningCategories = ['Moderate anxiety', 'Severe anxiety'];
+
+    if (positiveMoods.includes(mood) && concerningCategories.includes(categoryName)) {
+      const levelWord = categoryName === 'Severe anxiety' ? 'berat' : 'sedang';
+      return {
+        title: 'Sepertinya ada yang tidak sejalan',
+        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Ini bisa saja terjadi — kadang kita tetap terlihat baik-baik saja di luar, walau ada kekhawatiran yang tersimpan di dalam. Nggak apa-apa kalau perasaanmu memang sekompleks ini.`,
+      };
+    }
+
+    if (negativeMoods.includes(mood) && categoryName === 'Minimal anxiety') {
+      return {
+        title: 'Sedikit catatan',
+        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat minimal. Perasaan sedih atau lelah nggak selalu berhubungan langsung dengan kecemasan, dan itu wajar.`,
+      };
+    }
+
+    return null;
+  }
+
   function renderDashboard() {
     const saved = localStorage.getItem(STORAGE_KEY);
     const emptyEl = $('#checkin-empty');
     const filledEl = $('#checkin-filled');
+    const mismatchEl = $('#checkin-mismatch');
 
     if (!saved) {
       emptyEl.classList.remove('hidden');
       filledEl.classList.add('hidden');
+      mismatchEl.classList.add('hidden');
       return;
     }
 
@@ -357,9 +387,19 @@
       $('#ci-date').textContent = formatDate(data.date);
       $('#ci-score-badge').textContent = data.score;
       $('#ci-category').textContent = data.category;
+
+      const mismatch = getMismatchNote(data.mood, data.category);
+      if (mismatch) {
+        $('#mismatch-title').textContent = mismatch.title;
+        $('#mismatch-text').textContent = mismatch.text;
+        mismatchEl.classList.remove('hidden');
+      } else {
+        mismatchEl.classList.add('hidden');
+      }
     } catch (e) {
       emptyEl.classList.remove('hidden');
       filledEl.classList.add('hidden');
+      mismatchEl.classList.add('hidden');
     }
   }
 
@@ -380,6 +420,7 @@
     showPage('mood-page');
   });
   $('#dash-chat-btn').addEventListener('click', () => showPage('chat-page'));
+  $('#mismatch-chat-btn').addEventListener('click', () => showPage('chat-page'));
 
   /* ---------------------------------------------------------
      4. MOOD CHECK-IN
@@ -541,7 +582,7 @@
     if (greeted) return;
     greeted = true;
     addBubble(
-      'Hai, aku Companion Calmora 🌿 Ceritakan apa pun yang kamu rasakan hari ini, aku di sini untuk mendengarkan.',
+      'Hai, aku Calmora 🌿 Ceritakan apa pun yang kamu rasakan hari ini, aku di sini untuk mendengarkan.',
       'bot'
     );
   }
@@ -702,6 +743,7 @@
   if (chatNavLink) chatNavLink.addEventListener('click', greetIfNeeded);
   $('#dash-chat-btn').addEventListener('click', greetIfNeeded);
   $('#result-chat-btn').addEventListener('click', greetIfNeeded);
+  $('#mismatch-chat-btn').addEventListener('click', greetIfNeeded);
 
   /* ---------------------------------------------------------
      INIT
