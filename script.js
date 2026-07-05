@@ -1,790 +1,584 @@
 /* =========================================================
-   CALMORA — script.js
-   Prototype logic: navigation, mood check-in, anxiety screening,
-   scoring, chatbot simulation, localStorage persistence.
-   Bukan alat diagnosis. Semua data disimpan lokal di browser.
+   CALMORA — Design tokens
    ========================================================= */
-
-(function () {
-  'use strict';
-
-  /* ---------------------------------------------------------
-     STATE
-     --------------------------------------------------------- */
-  const state = {
-    selectedMood: null,
-    selectedEmoji: null,
-    currentQuestion: 0,
-    answers: new Array(7).fill(null),
-  };
-
-  const STORAGE_KEY = 'calmora_lastCheckin';
-
-  /* ---------------------------------------------------------
-     ANXIETY SCREENING DATA (konsep GAD-7, disederhanakan)
-     --------------------------------------------------------- */
-  const QUESTIONS = [
-    'Merasa gugup, cemas, atau tegang',
-    'Tidak mampu menghentikan atau mengendalikan rasa khawatir',
-    'Terlalu banyak khawatir tentang berbagai hal',
-    'Sulit untuk rileks',
-    'Begitu gelisah sehingga sulit untuk duduk diam',
-    'Mudah merasa kesal atau tersinggung',
-    'Merasa takut seolah sesuatu yang buruk akan terjadi',
-  ];
-
-  const OPTIONS = [
-    { label: 'Tidak sama sekali', value: 0 },
-    { label: 'Beberapa hari', value: 1 },
-    { label: 'Lebih dari separuh hari', value: 2 },
-    { label: 'Hampir setiap hari', value: 3 },
-  ];
-
-  const CATEGORIES = [
-    {
-      max: 4,
-      name: 'Minimal anxiety',
-      explanation:
-        'Hasil ini menunjukkan gejala kecemasan pada tingkat yang minimal. Sepertinya kondisimu cukup stabil belakangan ini.',
-      recommendations: [
-        'Pertahankan rutinitas tidur dan istirahat yang cukup',
-        'Luangkan waktu untuk aktivitas yang kamu nikmati',
-        'Sesekali cek-in dengan dirimu sendiri seperti hari ini',
-      ],
-    },
-    {
-      max: 9,
-      name: 'Mild anxiety',
-      explanation:
-        'Hasil ini menunjukkan gejala kecemasan pada tingkat ringan. Wajar untuk sesekali merasa begini, terutama saat banyak hal terjadi.',
-      recommendations: [
-        'Coba teknik pernapasan kotak (4-4-4-4): tarik napas selama 4 detik, tahan napas 4 detik, embuskan napas perlahan selama 4 detik, lalu tahan lagi 4 detik sebelum menarik napas berikutnya. Ulangi selama beberapa menit',
-        'Tuliskan apa yang kamu khawatirkan di jurnal',
-        'Kurangi paparan berita atau media yang memicu stres',
-      ],
-    },
-    {
-      max: 14,
-      name: 'Moderate anxiety',
-      explanation:
-        'Hasil ini menunjukkan gejala kecemasan pada tingkat sedang. Perasaan ini mungkin mulai terasa cukup mengganggu aktivitasmu.',
-      recommendations: [
-        'Coba teknik grounding 5-4-3-2-1 saat kecemasan muncul: sebutkan dalam hati 5 benda yang kamu lihat, 4 benda yang bisa kamu sentuh, 3 suara yang kamu dengar, 2 aroma yang bisa kamu cium, dan 1 rasa yang bisa kamu kecap. Teknik ini membantu mengalihkan fokus pikiran ke momen saat ini',
-        'Bicarakan perasaanmu dengan orang yang kamu percaya',
-        'Beri jeda dari tugas atau tanggung jawab yang menumpuk',
-        'Pertimbangkan konsultasi ringan dengan konselor kampus/kantor jika tersedia',
-      ],
-    },
-    {
-      max: 21,
-      name: 'Severe anxiety',
-      explanation:
-        'Hasil ini menunjukkan gejala kecemasan pada tingkat yang cukup berat. Penting untuk tidak menghadapi ini sendirian.',
-      recommendations: [
-        'Hubungi orang terdekat yang kamu percaya untuk bercerita',
-        'Coba teknik pernapasan kotak (4-4-4-4) sambil duduk di tempat yang tenang: tarik napas 4 detik, tahan 4 detik, buang napas 4 detik, tahan lagi 4 detik, ulangi beberapa kali',
-        'Kurangi dulu beban atau keputusan besar dalam waktu dekat',
-        'Pertimbangkan menjadwalkan sesi dengan tenaga profesional kesehatan mental',
-      ],
-    },
-  ];
-
-  function getCategory(score) {
-    return CATEGORIES.find((c) => score <= c.max);
-  }
-
-  /* ---------------------------------------------------------
-     CHATBOT COMPANION ENGINE
-     Simulasi berbasis pola kata kunci + variasi respons + memori
-     percakapan ringan, dibuat dengan gaya ngobrol santai kayak
-     ke temen deket (bukan AI sungguhan — lihat catatan soal
-     menyambungkan API asli).
-     --------------------------------------------------------- */
-
-  // Sapaan pembuka / basa-basi ringan
-  const GREETING_PATTERNS = ['halo', 'hai', 'hi', 'hey', 'pagi', 'siang', 'sore', 'malam', 'permisi'];
-  const GREETING_RESPONSES = [
-    'Haii 🌿 Gimana kabarnya hari ini?',
-    'Halo juga! Lagi mau cerita apa nih, atau cuma pengen ngobrol santai dulu juga gapapa.',
-    'Hai, seneng deh kamu mampir. Ada apa nih?',
-  ];
-
-  // Ucapan terima kasih / mau mengakhiri obrolan
-  const CLOSING_PATTERNS = ['makasih', 'terima kasih', 'thanks', 'thank you', 'oke deh', 'udah dulu ya', 'segitu aja'];
-  const CLOSING_RESPONSES = [
-    'Sama-sama! Seneng bisa nemenin kamu ngobrol. Balik lagi aja kapan-kapan kalau mau cerita lagi ya.',
-    'Santai aja, aku di sini kok kalau kamu butuh. Jaga diri ya 🌿',
-    'Iya, semangat terus ya. Aku ada di sini kalau kamu butuh temen cerita lagi.',
-  ];
-
-  // Balasan super singkat (iya, hmm, oke) yang butuh dorongan lanjutan
-  const SHORT_REPLY_PATTERNS = ['iya', 'ya', 'hmm', 'hm', 'oke', 'ok', 'oh', 'gitu', 'lah', 'terus', 'trus', 'nggak tau', 'ga tau', 'gatau', 'biasa aja', 'gapapa', 'gak papa'];
-  const SHORT_REPLY_RESPONSES = [
-    'Terus gimana?',
-    'Cerita dong, aku dengerin kok.',
-    'Nah, lanjutin aja, aku masih di sini.',
-    'Hmm oke, ada lagi yang mau kamu ceritain?',
-    'Boleh diperjelas dikit lagi? Aku pengen ngerti lebih dalem.',
-  ];
-
-  // Pengen cerita / curhat tapi belum masuk topik spesifik
-  const INVITATION_PATTERNS = ['mau cerita', 'pengen cerita', 'boleh cerita', 'mau curhat', 'pengen curhat', 'aku mau', 'ada yang mau aku ceritain', 'belum cerita'];
-  const INVITATION_RESPONSES = [
-    'Boleh banget. Cerita aja pelan-pelan, nggak perlu buru-buru, aku dengerin sampai selesai.',
-    'Aku siap dengerin. Mau mulai dari mana aja gapapa kok.',
-    'Silakan, aku di sini kok, nggak akan motong ceritamu.',
-  ];
-
-  // Kategori emosi: tiap kategori punya beberapa variasi validasi + saran,
-  // dan beberapa pertanyaan lanjutan yang open-ended, gaya santai.
-  const EMOTION_CATEGORIES = [
-    {
-      name: 'cemas',
-      keywords: ['cemas', 'khawatir', 'anxious', 'panik', 'gelisah', 'was-was', 'waswas', 'deg-degan'],
-      responses: [
-        'Duh, cemas emang nggak enak banget ya. Coba deh teknik pernapasan kotak: tarik napas pelan 4 detik, tahan 4 detik, buang napas perlahan 4 detik, terus tahan lagi 4 detik sebelum tarik napas berikutnya. Yuk kita coba bareng, ulangi beberapa kali.',
-        'Wajar kok ngerasa cemas gitu. Kadang pikiran emang suka lompat-lompat kalau lagi kayak gini.',
-        'Cemas biasanya muncul kalau ada yang berasa nggak pasti nih. Ada hal spesifik yang bikin kamu gini?',
-      ],
-      followups: [
-        'Ini mulai kerasa dari kapan sih?',
-        'Ada penyebab spesifiknya, atau cuma perasaan umum aja?',
-        'Biasanya apa sih yang bikin kamu agak tenangan?',
-      ],
-    },
-    {
-      name: 'sedih',
-      keywords: ['sedih', 'kecewa', 'nangis', 'menangis', 'hampa', 'kosong', 'patah hati', 'galau'],
-      responses: [
-        'Duh, aku ikut sedih dengernya. Gapapa kok kalau mau sedih dulu, nggak usah maksa baik-baik aja.',
-        'Kedengerannya ini berat banget ya buat kamu. Cerita aja pelan-pelan, aku dengerin.',
-        'Sedih emang bagian dari hidup sih, walau tetep aja nggak enak ngerasainnya. Makasih udah mau cerita ke aku.',
-      ],
-      followups: [
-        'Ada kejadian tertentu yang bikin kamu sesedih ini?',
-        'Udah ada yang tau perasaan kamu ini selain aku?',
-        'Kamu butuhnya didengerin aja, dialihin, apa mau dikasih saran nih?',
-      ],
-    },
-    {
-      name: 'capek',
-      keywords: ['capek', 'lelah', 'cape', 'penat', 'burnout', 'kecapean', 'ngantuk banget'],
-      responses: [
-        'Kayaknya kamu udah kerja keras banget belakangan ya. Istirahat dulu gapapa kok, 10 menit tanpa layar aja udah lumayan banget.',
-        'Capek fisik sama capek pikiran itu beda tapi sama-sama valid buat diakuin. Udah berapa lama nih ngerasa gini?',
-        'Duh, capek ya. Kadang badan sama otak emang butuh jeda dulu sebelum lanjut lagi.',
-      ],
-      followups: [
-        'Kira-kira apa yang paling nguras energi kamu belakangan ini?',
-        'Kapan terakhir kali bener-bener istirahat tanpa mikirin apa-apa?',
-        'Ada waktu buat istirahat bentar hari ini?',
-      ],
-    },
-    {
-      name: 'takut',
-      keywords: ['takut', 'ngeri', 'serem', 'phobia', 'trauma'],
-      responses: [
-        'Takut itu emang berat ya, makasih udah mau cerita. Coba deh teknik grounding 5-4-3-2-1: sebutin dalam hati 5 benda yang kamu liat, 4 benda yang bisa disentuh, 3 suara yang kamu denger, 2 aroma yang bisa kamu cium, dan 1 rasa yang bisa kamu kecap. Ini bantu kamu balik fokus ke saat ini.',
-        'Aku denger kamu lagi takut. Kamu nggak sendirian kok ngerasain ini, pelan-pelan aja ceritanya.',
-        'Rasa takut biasanya muncul buat ngelindungin kita. Ini soal yang udah kejadian, atau yang mungkin bakal kejadian?',
-      ],
-      followups: [
-        'Apa yang paling bikin kamu takut dari situasi ini?',
-        'Ada orang yang bisa kamu ajak ngobrol soal ini juga?',
-        'Kira-kira hal kecil apa yang bisa bikin kamu ngerasa agak aman sekarang?',
-      ],
-    },
-    {
-      name: 'marah',
-      keywords: ['marah', 'kesal', 'jengkel', 'emosi', 'bete', 'sebel'],
-      responses: [
-        'Wah, kedengerannya kamu kesel banget ya. Wajar kok marah, biasanya itu tanda ada hal penting yang berasa dilanggar.',
-        'Aku denger kamu lagi marah nih. Cerita dong, apa yang bikin gini?',
-        'Marah tuh sering nyimpen pesan penting di baliknya. Pelan-pelan aja ceritain kalau mau.',
-      ],
-      followups: [
-        'Apa sih pemicu utamanya?',
-        'Udah sempet kamu omongin perasaan ini ke orangnya?',
-        'Biasanya apa yang bikin kamu agak tenangan kalau lagi marah?',
-      ],
-    },
-    {
-      name: 'kesepian',
-      keywords: ['kesepian', 'sendirian', 'sendiri banget', 'nggak ada teman', 'ga ada temen'],
-      responses: [
-        'Duh, kesepian emang berat ya. Seneng deh kamu mau cerita ke sini, at least sekarang kamu nggak sendirian.',
-        'Aku denger kamu ngerasa sendirian. Itu valid banget kok, walau kadang susah dijelasin ke orang lain.',
-      ],
-      followups: [
-        'Ada orang yang biasanya bikin kamu ngerasa terhubung dikit, siapa pun itu?',
-        'Ini mulai kerasa berat sejak kapan?',
-      ],
-    },
-    {
-      name: 'senang',
-      keywords: ['senang', 'bahagia', 'happy', 'seru', 'bersyukur', 'excited', 'lega'],
-      responses: [
-        'Wah asik banget! Aku ikut seneng dengernya. Cerita dong apa yang bikin harimu jadi bagus gini?',
-        'Itu kabar bagus tuh. Momen kayak gini layak dirayain, sekecil apa pun itu.',
-        'Suka deh denger ini. Semoga mood baiknya bisa awet ya.',
-      ],
-      followups: [
-        'Apa nih yang paling bikin kamu ngerasa gini hari ini?',
-        'Ada rencana buat rayain momen ini?',
-      ],
-    },
-  ];
-
-  // Fallback reflektif kalau tidak ada kata kunci yang cocok —
-  // dipecah jadi dua bagian lalu dikombinasikan biar variasinya banyak.
-  const REFLECTIVE_OPENERS = [
-    'Oke, aku denger ceritamu.',
-    'Makasih udah mau cerita ini.',
-    'Kedengerannya ini penting banget buat kamu.',
-    'Aku appreciate banget kamu mau share ini.',
-    'Wah, makasih udah percaya cerita ini ke aku.',
-  ];
-  const REFLECTIVE_QUESTIONS = [
-    'Mau lanjut cerita lebih detail?',
-    'Kira-kira gimana perasaanmu soal itu sekarang?',
-    'Ada bagian yang paling berat dari itu?',
-    'Biasanya apa sih yang bikin kamu ngerasa mendingan kalau kayak gini?',
-    'Cerita aja lebih lanjut, aku dengerin kok.',
-    'Boleh diceritain lebih detail, aku dengerin kok.',
-  ];
-
-  // Kata-kata fungsi yang diabaikan saat menangkap "topik" dari kalimat user,
-  // supaya kata yang tersisa lebih mungkin berupa hal spesifik yang diceritakan
-  // (misal: "kerjaan", "ujian", "pacar", "keluarga") bukan kata sambung/ganti.
-  const STOPWORDS = [
-    'yang', 'di', 'ke', 'dari', 'dan', 'atau', 'aku', 'kamu', 'ini', 'itu', 'saya', 'dia',
-    'mereka', 'kita', 'ada', 'juga', 'sudah', 'udah', 'belum', 'akan', 'sedang', 'lagi',
-    'banget', 'sih', 'deh', 'dong', 'nih', 'kok', 'ya', 'gak', 'ga', 'nggak', 'enggak',
-    'tidak', 'bukan', 'karena', 'kalau', 'kalo', 'tapi', 'tetapi', 'sama', 'dengan', 'untuk',
-    'buat', 'biar', 'supaya', 'jadi', 'terus', 'trus', 'aja', 'saja', 'mau', 'pengen',
-    'harus', 'bisa', 'dapat', 'masih', 'sekarang', 'hari', 'tuh', 'gitu', 'gini', 'sangat',
-    'lebih', 'paling', 'pun', 'pada', 'oleh', 'saat', 'waktu', 'ketika', 'begitu', 'begini',
-    'satu', 'dua', 'tiga', 'orang', 'nya', 'ku', 'mu', 'apa', 'gimana', 'kenapa', 'akhir',
-  ];
-
-  // Template respons yang menyisipkan kembali "topik" dari kalimat user,
-  // supaya kelihatan lebih nyambung ke isi cerita, bukan cuma template kosong.
-  const TOPIC_OPENERS = [
-    'Soal {topic} ini kedengarannya lumayan berat ya buat kamu.',
-    'Aku denger kamu lagi mikirin {topic}.',
-    'Hmm, {topic} ya. Kedengarannya ini beneran ngefek ke kamu.',
-    'Makasih udah cerita soal {topic} ke aku.',
-    'Jadi ini soal {topic} ya. Aku dengerin kok.',
-  ];
-
-  /* ---------------------------------------------------------
-     DOM HELPERS
-     --------------------------------------------------------- */
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
-
-  function showPage(id) {
-    $$('.page').forEach((p) => p.classList.remove('active'));
-    const target = document.getElementById(id);
-    if (target) target.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    $$('.nav-link').forEach((link) => {
-      link.classList.toggle('active', link.dataset.target === id);
-    });
-  }
-
-  function showNavbar() {
-    $('#navbar').classList.remove('hidden');
-  }
-
-  /* ---------------------------------------------------------
-     1. LANDING -> DISCLAIMER
-     --------------------------------------------------------- */
-  $('#start-btn').addEventListener('click', () => {
-    showPage('disclaimer-page');
-  });
-
-  /* ---------------------------------------------------------
-     2. DISCLAIMER
-     --------------------------------------------------------- */
-  const agreeCheckbox = $('#agree-checkbox');
-  const continueBtn = $('#continue-btn');
-
-  agreeCheckbox.addEventListener('change', () => {
-    continueBtn.disabled = !agreeCheckbox.checked;
-  });
-
-  continueBtn.addEventListener('click', () => {
-    showNavbar();
-    renderDashboard();
-    showPage('dashboard-page');
-  });
-
-  /* ---------------------------------------------------------
-     3. NAVBAR LINKS
-     --------------------------------------------------------- */
-  $$('.nav-link').forEach((link) => {
-    link.addEventListener('click', () => {
-      const target = link.dataset.target;
-      if (target === 'mood-page') resetMoodAndScreening();
-      if (target === 'dashboard-page') renderDashboard();
-      showPage(target);
-    });
-  });
-
-  /* ---------------------------------------------------------
-     DASHBOARD
-     --------------------------------------------------------- */
-
-  // Setiap kombinasi mood + kategori hasil screening dapat penjelasan
-  // kontekstualnya sendiri — bukan cuma ditampilkan saat nggak sejalan,
-  // tapi selalu ada catatan yang relevan di dashboard.
-  const CONCERN_LEVEL_WORDS = {
-    'Minimal anxiety': 'rendah',
-    'Mild anxiety': 'ringan',
-    'Moderate anxiety': 'sedang',
-    'Severe anxiety': 'berat',
-  };
-
-  function getMoodValence(mood) {
-    if (['Senang', 'Baik'].includes(mood)) return 'positive';
-    if (['Sedih', 'Cemas', 'Lelah'].includes(mood)) return 'negative';
-    return 'neutral';
-  }
-
-  function getConcernLevel(categoryName) {
-    return ['Moderate anxiety', 'Severe anxiety'].includes(categoryName) ? 'high' : 'low';
-  }
-
-  function getMismatchNote(mood, categoryName) {
-    const valence = getMoodValence(mood);
-    const concern = getConcernLevel(categoryName);
-    const levelWord = CONCERN_LEVEL_WORDS[categoryName] || 'tertentu';
-
-    if (valence === 'positive' && concern === 'low') {
-      return {
-        tone: 'positive',
-        title: 'Mood dan hasilmu sejalan',
-        text: `Kamu memilih mood "${mood}" dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Sepertinya kondisimu memang cukup stabil hari ini — pertahankan kebiasaan baik yang udah kamu jalani.`,
-      };
-    }
-    if (valence === 'positive' && concern === 'high') {
-      return {
-        tone: 'concern',
-        title: 'Sepertinya ada yang tidak sejalan',
-        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Ini bisa saja terjadi — kadang kita tetap terlihat baik-baik saja di luar, walau ada kekhawatiran yang tersimpan di dalam. Nggak apa-apa kalau perasaanmu memang sekompleks ini.`,
-      };
-    }
-    if (valence === 'neutral' && concern === 'low') {
-      return {
-        tone: 'positive',
-        title: 'Sepertinya cukup stabil',
-        text: `Kamu memilih mood "Biasa" dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Harimu sepertinya berjalan cukup netral dan stabil.`,
-      };
-    }
-    if (valence === 'neutral' && concern === 'high') {
-      return {
-        tone: 'concern',
-        title: 'Ada yang perlu diperhatikan',
-        text: `Kamu memilih mood "Biasa", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Kadang kita nggak selalu sadar penuh sama kekhawatiran yang lagi dirasain. Coba cek rekomendasi self-care di halaman hasil screening ya.`,
-      };
-    }
-    if (valence === 'negative' && concern === 'low') {
-      return {
-        tone: 'neutral',
-        title: 'Sedikit catatan',
-        text: `Kamu memilih mood "${mood}", tapi hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Perasaan itu nggak selalu berhubungan langsung dengan kecemasan, dan itu wajar.`,
-      };
-    }
-    // negative && high — mood dan hasil sama-sama menunjukkan ada yang berat
-    return {
-      tone: 'concern',
-      title: 'Hasil ini sejalan dengan perasaanmu',
-      text: `Kamu memilih mood "${mood}", dan hasil screening menunjukkan gejala kecemasan pada tingkat ${levelWord}. Wajar kalau kondisi ini terasa berat — coba lihat rekomendasi self-care di halaman hasil, dan ingat kamu nggak harus menghadapinya sendirian.`,
-    };
-  }
-
-  function renderDashboard() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const emptyEl = $('#checkin-empty');
-    const filledEl = $('#checkin-filled');
-    const mismatchEl = $('#checkin-mismatch');
-
-    if (!saved) {
-      emptyEl.classList.remove('hidden');
-      filledEl.classList.add('hidden');
-      mismatchEl.classList.add('hidden');
-      return;
-    }
-
-    try {
-      const data = JSON.parse(saved);
-      emptyEl.classList.add('hidden');
-      filledEl.classList.remove('hidden');
-
-      $('#ci-mood-emoji').textContent = data.emoji || '🙂';
-      $('#ci-mood-label').textContent = data.mood || '—';
-      $('#ci-date').textContent = formatDate(data.date);
-      $('#ci-score-badge').textContent = data.score;
-      $('#ci-category').textContent = data.category;
-
-      const mismatch = getMismatchNote(data.mood, data.category);
-      $('#mismatch-title').textContent = mismatch.title;
-      $('#mismatch-text').textContent = mismatch.text;
-      mismatchEl.classList.remove('hidden', 'tone-positive', 'tone-neutral', 'tone-concern');
-      mismatchEl.classList.add(`tone-${mismatch.tone}`);
-    } catch (e) {
-      emptyEl.classList.remove('hidden');
-      filledEl.classList.add('hidden');
-      mismatchEl.classList.add('hidden');
-    }
-  }
-
-  function formatDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  $('#dash-checkin-btn').addEventListener('click', () => {
-    resetMoodAndScreening();
-    showPage('mood-page');
-  });
-  $('#dash-chat-btn').addEventListener('click', () => showPage('chat-page'));
-  $('#mismatch-chat-btn').addEventListener('click', () => showPage('chat-page'));
-
-  /* ---------------------------------------------------------
-     4. MOOD CHECK-IN
-     --------------------------------------------------------- */
-  function resetMoodAndScreening() {
-    state.selectedMood = null;
-    state.selectedEmoji = null;
-    state.currentQuestion = 0;
-    state.answers = new Array(7).fill(null);
-    $$('.mood-option').forEach((btn) => btn.classList.remove('selected'));
-    $('#mood-next-btn').disabled = true;
-  }
-
-  $$('.mood-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      $$('.mood-option').forEach((b) => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      state.selectedMood = btn.dataset.mood;
-      state.selectedEmoji = btn.dataset.emoji;
-      $('#mood-next-btn').disabled = false;
-    });
-  });
-
-  $('#mood-next-btn').addEventListener('click', () => {
-    state.currentQuestion = 0;
-    renderQuestion();
-    showPage('screening-page');
-  });
-
-  /* ---------------------------------------------------------
-     5. ANXIETY SCREENING
-     --------------------------------------------------------- */
-  function renderQuestion() {
-    const idx = state.currentQuestion;
-    $('#question-text').textContent = QUESTIONS[idx];
-    $('#progress-label').textContent = `Pertanyaan ${idx + 1} dari 7`;
-    $('#progress-fill').style.width = `${((idx + 1) / 7) * 100}%`;
-
-    const list = $('#option-list');
-    list.innerHTML = '';
-
-    OPTIONS.forEach((opt) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'option-item';
-      btn.textContent = opt.label;
-      if (state.answers[idx] === opt.value) btn.classList.add('selected');
-
-      btn.addEventListener('click', () => {
-        state.answers[idx] = opt.value;
-        list.querySelectorAll('.option-item').forEach((b) => b.classList.remove('selected'));
-        btn.classList.add('selected');
-
-        // Auto-advance after a short pause for a smoother feel
-        setTimeout(() => {
-          if (state.currentQuestion < 6) {
-            state.currentQuestion++;
-            renderQuestion();
-          } else {
-            finishScreening();
-          }
-        }, 220);
-      });
-
-      list.appendChild(btn);
-    });
-
-    $('#question-back-btn').style.visibility = idx === 0 ? 'hidden' : 'visible';
-  }
-
-  $('#question-back-btn').addEventListener('click', () => {
-    if (state.currentQuestion > 0) {
-      state.currentQuestion--;
-      renderQuestion();
-    } else {
-      showPage('mood-page');
-    }
-  });
-
-  function finishScreening() {
-    const score = state.answers.reduce((sum, v) => sum + (v || 0), 0);
-    const category = getCategory(score);
-    renderResult(score, category);
-    saveCheckin(score, category);
-    showPage('result-page');
-  }
-
-  /* ---------------------------------------------------------
-     6. RESULT PAGE
-     --------------------------------------------------------- */
-  function renderResult(score, category) {
-    $('#result-score-number').textContent = score;
-    $('#result-category').textContent = category.name;
-    $('#result-explanation').textContent = category.explanation;
-
-    const list = $('#result-recommend-list');
-    list.innerHTML = '';
-    category.recommendations.forEach((rec) => {
-      const li = document.createElement('li');
-      li.textContent = rec;
-      list.appendChild(li);
-    });
-
-    $('#result-crisis').classList.toggle('hidden', category.name !== 'Severe anxiety');
-  }
-
-  function saveCheckin(score, category) {
-    const data = {
-      mood: state.selectedMood,
-      emoji: state.selectedEmoji,
-      score,
-      category: category.name,
-      date: new Date().toISOString(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
-
-  $('#result-dashboard-btn').addEventListener('click', () => {
-    renderDashboard();
-    showPage('dashboard-page');
-  });
-  $('#result-chat-btn').addEventListener('click', () => showPage('chat-page'));
-
-  /* ---------------------------------------------------------
-     7. CHATBOT COMPANION (keyword-based simulation)
-     --------------------------------------------------------- */
-  const chatWindow = $('#chat-window');
-  const chatForm = $('#chat-form');
-  const chatInput = $('#chat-input');
-  let greeted = false;
-
-  // Memori ringan percakapan: topik terakhir & respons terakhir,
-  // supaya bot tidak mengulang kalimat yang sama persis dua kali berturut-turut.
-  const chatMemory = {
-    lastTopic: null,
-    lastResponse: null,
-    turnCount: 0,
-  };
-
-  function addBubble(text, sender) {
-    const bubble = document.createElement('div');
-    bubble.className = `bubble ${sender === 'bot' ? 'bubble-bot' : 'bubble-user'}`;
-    bubble.textContent = text;
-    chatWindow.appendChild(bubble);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-    return bubble;
-  }
-
-  function showTypingIndicator() {
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble bubble-bot bubble-typing';
-    bubble.innerHTML = '<span></span><span></span><span></span>';
-    chatWindow.appendChild(bubble);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-    return bubble;
-  }
-
-  function greetIfNeeded() {
-    if (greeted) return;
-    greeted = true;
-    addBubble(
-      'Hai, aku Calmora 🌿 Ceritakan apa pun yang kamu rasakan hari ini, aku di sini untuk mendengarkan.',
-      'bot'
-    );
-  }
-
-  // Sistem "bag": ambil dari kantung yang sudah diacak sampai habis,
-  // baru diacak ulang. Ini bikin variasi kalimat nggak berulang terus-menerus
-  // selama variannya belum habis dipakai semua.
-  const responseBags = new Map();
-
-  function shuffle(arr) {
-    const copy = [...arr];
-    for (let i = copy.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-  }
-
-  function pickFromBag(arr) {
-    if (!arr || arr.length === 0) return '';
-    if (arr.length === 1) return arr[0];
-    let bag = responseBags.get(arr);
-    if (!bag || bag.length === 0) {
-      bag = shuffle(arr);
-      responseBags.set(arr, bag);
-    }
-    return bag.pop();
-  }
-
-  function matchesAny(text, patterns) {
-    return patterns.some((kw) => text === kw || text.includes(kw));
-  }
-
-  function matchEmotionCategory(text) {
-    for (const cat of EMOTION_CATEGORIES) {
-      if (cat.keywords.some((kw) => text.includes(kw))) return cat;
-    }
-    return null;
-  }
-
-  // Ambil kata-kata "isi" dari kalimat user (bukan kata sambung/kata kunci
-  // emosi yang sudah ditangani terpisah), buat disisipkan balik ke jawaban
-  // supaya bot kelihatan menyimak isi cerita, bukan cuma pola generik.
-  const ALL_KNOWN_PATTERNS = [
-    ...EMOTION_CATEGORIES.flatMap((c) => c.keywords),
-    ...GREETING_PATTERNS,
-    ...SHORT_REPLY_PATTERNS,
-    ...CLOSING_PATTERNS,
-    ...INVITATION_PATTERNS,
-  ];
-
-  function extractTopic(text) {
-    const words = text
-      .replace(/[^\p{L}\p{N}\s-]/gu, '')
-      .split(/\s+/)
-      .filter(Boolean);
-
-    const contentWords = words.filter((w) => {
-      const lw = w.toLowerCase();
-      return lw.length >= 3 && !STOPWORDS.includes(lw) && !ALL_KNOWN_PATTERNS.includes(lw);
-    });
-
-    if (contentWords.length === 0) return null;
-    return contentWords.slice(0, 3).join(' ');
-  }
-
-  function getBotResponse(userTextRaw) {
-    const text = userTextRaw.toLowerCase().trim();
-    chatMemory.turnCount++;
-
-    // 1. Sapaan
-    if (GREETING_PATTERNS.some((kw) => text === kw || text.startsWith(kw + ' ') || text.startsWith(kw + ','))) {
-      const reply = pickFromBag(GREETING_RESPONSES);
-      chatMemory.lastTopic = 'greeting';
-      return reply;
-    }
-
-    // 2. Penutup / ucapan terima kasih
-    if (matchesAny(text, CLOSING_PATTERNS)) {
-      const reply = pickFromBag(CLOSING_RESPONSES);
-      chatMemory.lastTopic = 'closing';
-      return reply;
-    }
-
-    // 3. Ajakan mau cerita/curhat tapi belum spesifik
-    if (matchesAny(text, INVITATION_PATTERNS)) {
-      const reply = pickFromBag(INVITATION_RESPONSES);
-      chatMemory.lastTopic = 'invitation';
-      return reply;
-    }
-
-    // 4. Kategori emosi yang cocok
-    const category = matchEmotionCategory(text);
-    if (category) {
-      const sameTopicAsBefore = chatMemory.lastTopic === category.name;
-      const topic = extractTopic(text);
-      let reply;
-      if (sameTopicAsBefore && Math.random() < 0.6) {
-        reply = pickFromBag(category.followups);
-      } else {
-        const base = pickFromBag(category.responses);
-        if (topic && Math.random() < 0.4) {
-          reply = `${base} Kalau boleh tau, ini soal ${topic}, ya?`;
-        } else {
-          const addFollowup = category.followups && Math.random() < 0.45;
-          reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
-        }
-      }
-      chatMemory.lastTopic = category.name;
-      return reply;
-    }
-
-    // 5. Balasan super singkat (iya, hmm, oke, dsb) — hanya dianggap "singkat"
-    // kalau memang pendek, supaya kalimat panjang tetap masuk fallback reflektif.
-    const wordCount = text.split(/\s+/).filter(Boolean).length;
-    if (wordCount <= 3 && matchesAny(text, SHORT_REPLY_PATTERNS)) {
-      const reply = pickFromBag(SHORT_REPLY_RESPONSES);
-      chatMemory.lastTopic = 'short';
-      return reply;
-    }
-
-    // 6. Fallback reflektif (tidak ada pola yang cocok sama sekali).
-    // Kalau ada kata "isi" yang bisa ditangkap dari kalimat user, sisipkan
-    // balik ke jawaban supaya kelihatan menyesuaikan cerita, bukan generik.
-    const topic = extractTopic(text);
-    const question = pickFromBag(REFLECTIVE_QUESTIONS);
-    let reply;
-    if (topic) {
-      const template = pickFromBag(TOPIC_OPENERS);
-      reply = `${template.replace('{topic}', topic)} ${question}`;
-    } else {
-      const opener = pickFromBag(REFLECTIVE_OPENERS);
-      reply = `${opener} ${question}`;
-    }
-    chatMemory.lastTopic = 'general';
-    return reply;
-  }
-
-  chatForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const value = chatInput.value.trim();
-    if (!value) return;
-
-    addBubble(value, 'user');
-    chatInput.value = '';
-
-    const typingBubble = showTypingIndicator();
-    const thinkTime = 500 + Math.random() * 500;
-
-    setTimeout(() => {
-      typingBubble.remove();
-      addBubble(getBotResponse(value), 'bot');
-    }, thinkTime);
-  });
-
-  // Greet the first time the chat page becomes visible
-  const chatNavLink = document.querySelector('.nav-link[data-target="chat-page"]');
-  if (chatNavLink) chatNavLink.addEventListener('click', greetIfNeeded);
-  $('#dash-chat-btn').addEventListener('click', greetIfNeeded);
-  $('#result-chat-btn').addEventListener('click', greetIfNeeded);
-  $('#mismatch-chat-btn').addEventListener('click', greetIfNeeded);
-
-  /* ---------------------------------------------------------
-     INIT
-     --------------------------------------------------------- */
-  renderDashboard();
-})();
+:root{
+  --cream: #FFF8F0;
+  --cream-soft: #FFFDFB;
+  --sage: #A8C3A0;
+  --sage-dark: #7FA075;
+  --blue: #BFD7EA;
+  --blue-dark: #93B7D6;
+  --peach: #F7B7A3;
+  --peach-dark: #F0987D;
+  --gray: #333333;
+  --gray-soft: #6B6B6B;
+  --white: #FFFFFF;
+
+  --shadow-soft: 0 8px 30px rgba(51, 51, 51, 0.07);
+  --shadow-soft-lg: 0 16px 40px rgba(51, 51, 51, 0.10);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+*{ box-sizing: border-box; margin:0; padding:0; }
+
+html{ scroll-behavior: smooth; }
+
+body{
+  font-family: var(--font-body);
+  color: var(--gray);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  background-color: var(--cream);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 420'%3E%3Ccircle cx='1260' cy='90' r='50' fill='%23F7B7A3' fill-opacity='0.30'/%3E%3Ccircle cx='160' cy='60' r='4' fill='%23FFFFFF' fill-opacity='0.55'/%3E%3Ccircle cx='320' cy='100' r='3' fill='%23FFFFFF' fill-opacity='0.5'/%3E%3Ccircle cx='720' cy='55' r='3' fill='%23FFFFFF' fill-opacity='0.5'/%3E%3Ccircle cx='980' cy='120' r='4' fill='%23FFFFFF' fill-opacity='0.5'/%3E%3Ccircle cx='560' cy='130' r='2.5' fill='%23FFFFFF' fill-opacity='0.45'/%3E%3Cpath d='M0 280 Q220 210 480 260 T960 240 T1440 220 V420 H0 Z' fill='%23BFD7EA' fill-opacity='0.32'/%3E%3Cpath d='M0 330 Q260 260 560 310 T1100 285 T1440 275 V420 H0 Z' fill='%23A8C3A0' fill-opacity='0.38'/%3E%3C/svg%3E"),
+    radial-gradient(circle at 8% 10%, rgba(168, 195, 160, 0.22) 0%, transparent 42%),
+    radial-gradient(circle at 95% 6%, rgba(191, 215, 234, 0.22) 0%, transparent 36%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: bottom center, top left, top right;
+  background-size: cover, auto, auto;
+  background-attachment: fixed, fixed, fixed;
+}
+
+h1,h2,h3,h4{
+  font-family: var(--font-display);
+  color: var(--gray);
+  line-height: 1.25;
+}
+
+p{ color: var(--gray-soft); line-height: 1.65; }
+
+button{ font-family: var(--font-body); cursor: pointer; border: none; background: none; }
+input{ font-family: var(--font-body); }
+
+:focus-visible{
+  outline: 3px solid var(--blue-dark);
+  outline-offset: 2px;
+}
+
+.hidden{ display: none !important; }
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 30px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+.btn:active{ transform: scale(0.97); }
+
+.btn-primary{
+  background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+  color: var(--white);
+  box-shadow: 0 10px 24px rgba(127, 160, 117, 0.35);
+}
+.btn-primary:hover{ box-shadow: 0 14px 30px rgba(127, 160, 117, 0.45); }
+.btn-primary:disabled{
+  background: #DCE3DA;
+  color: #97A492;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-secondary{
+  background: var(--white);
+  color: var(--gray);
+  border: 1.5px solid var(--blue-dark);
+  box-shadow: var(--shadow-soft);
+}
+.btn-secondary:hover{ background: var(--blue); }
+
+.btn-ghost{
+  color: var(--gray-soft);
+  font-weight: 500;
+  padding: 10px 6px;
+}
+.btn-ghost:hover{ color: var(--gray); }
+
+/* =========================================================
+   Layout helpers
+   ========================================================= */
+#app{ width: 100%; min-height: 100vh; }
+
+.page{
+  display: none;
+  width: 100%;
+  min-height: 100vh;
+  padding: 32px 20px 80px;
+}
+.page.active{ display: flex; flex-direction: column; align-items: center; }
+
+.page-inner{ width: 100%; max-width: 760px; margin: 0 auto; }
+.page-inner.narrow{ max-width: 620px; }
+
+.page-header{ margin-bottom: 28px; }
+.page-header h2{ font-size: 26px; margin: 6px 0 8px; }
+.subtext{ font-size: 15px; }
+
+.eyebrow{
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sage-dark);
+}
+
+.tag-pill{
+  display: inline-block;
+  background: var(--blue);
+  color: var(--gray);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.card{
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 32px;
+}
+
+/* =========================================================
+   Navbar
+   ========================================================= */
+.navbar{
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 248, 240, 0.88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(51,51,51,0.06);
+}
+.nav-inner{
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-logo{
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.orb-mini{
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--peach), var(--sage) 70%);
+  display: inline-block;
+}
+.nav-links{ display: flex; gap: 6px; }
+.nav-link{
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nav-link:hover{ background: var(--blue); color: var(--gray); }
+.nav-link.active{ background: var(--sage); color: var(--white); }
+
+/* =========================================================
+   1. Landing page + signature breathing orb
+   ========================================================= */
+.landing{ justify-content: center; padding-top: 60px; }
+.landing-inner{
+  text-align: center;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.breathing-orb{
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  margin-bottom: 28px;
+  background: radial-gradient(circle at 35% 30%, var(--peach) 0%, var(--sage) 55%, var(--blue) 100%);
+  box-shadow: 0 0 0 14px rgba(168, 195, 160, 0.18), 0 0 60px rgba(191, 215, 234, 0.5);
+  animation: breathe 5.2s ease-in-out infinite;
+}
+@keyframes breathe{
+  0%, 100% { transform: scale(0.86); }
+  50% { transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce){
+  .breathing-orb{ animation: none; }
+}
+
+.brand-title{
+  font-size: 46px;
+  font-weight: 700;
+  margin: 6px 0 10px;
+  letter-spacing: -0.01em;
+}
+.tagline{
+  font-size: 16px;
+  max-width: 400px;
+  margin-bottom: 28px;
+}
+.landing-footnote{
+  margin-top: 18px;
+  font-size: 12.5px;
+  color: #9A9A9A;
+}
+
+/* =========================================================
+   2. Disclaimer page
+   ========================================================= */
+.disclaimer{ justify-content: center; padding-top: 60px; }
+.disclaimer-card{ max-width: 560px; }
+.disclaimer-card h2{ font-size: 22px; margin-bottom: 16px; }
+.disclaimer-text{ margin-bottom: 14px; font-size: 14.5px; }
+.disclaimer-text strong{ color: var(--gray); }
+
+.checkbox-row{
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 22px 0 24px;
+  padding: 16px;
+  background: var(--cream);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--gray);
+  cursor: pointer;
+}
+.checkbox-row input{
+  width: 18px; height: 18px;
+  margin-top: 2px;
+  accent-color: var(--sage-dark);
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   3. Dashboard
+   ========================================================= */
+.calm-illustration{
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 24px;
+  display: block;
+}
+
+.checkin-card{ margin-bottom: 24px; }
+.checkin-empty p{ font-size: 14.5px; }
+
+.checkin-top{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.checkin-emoji{ font-size: 40px; }
+.checkin-mood-label{ font-weight: 600; font-size: 17px; color: var(--gray); }
+.checkin-date{ font-size: 13px; color: var(--gray-soft); }
+
+.checkin-score-row{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid #F0EAE0;
+}
+.score-badge{
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--peach);
+  color: var(--white);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.checkin-category{ font-weight: 600; color: var(--gray); }
+.checkin-sub{ font-size: 12.5px; }
+
+.dashboard-actions{ display: flex; flex-wrap: wrap; gap: 12px; }
+
+.checkin-mismatch{
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.checkin-mismatch.tone-positive{
+  background: #F1F7EE;
+  border-color: var(--sage);
+}
+.checkin-mismatch.tone-neutral{
+  background: #EFF5F9;
+  border-color: var(--blue-dark);
+}
+.checkin-mismatch.tone-concern{
+  background: #FBF3E8;
+  border-color: var(--peach);
+}
+.mismatch-title{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--gray);
+  margin-bottom: 6px;
+}
+.mismatch-text{
+  font-size: 13.5px;
+  margin-bottom: 14px;
+}
+.mismatch-btn{ padding: 10px 20px; font-size: 13.5px; }
+
+/* =========================================================
+   4. Mood check-in
+   ========================================================= */
+.mood-grid{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 30px;
+}
+.mood-option{
+  background: var(--white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 22px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--gray-soft);
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.mood-option:hover{ transform: translateY(-3px); }
+.mood-option.selected{
+  border-color: var(--sage-dark);
+  background: #F3F8F1;
+  color: var(--gray);
+}
+.mood-emoji{ font-size: 30px; }
+
+/* =========================================================
+   5. Screening
+   ========================================================= */
+.progress-track{
+  width: 100%;
+  height: 8px;
+  background: #EFE7DA;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress-fill{
+  height: 100%;
+  width: 14.28%;
+  background: linear-gradient(90deg, var(--sage), var(--blue-dark));
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.progress-label{ font-size: 13px; color: var(--gray-soft); margin-bottom: 20px; }
+
+.question-card{ margin-bottom: 18px; }
+.question-text{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--gray);
+  margin-bottom: 22px;
+}
+.option-list{ display: flex; flex-direction: column; gap: 10px; }
+.option-item{
+  text-align: left;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--cream);
+  border: 2px solid transparent;
+  font-size: 14.5px;
+  color: var(--gray);
+  transition: border-color 0.15s ease, background 0.15s ease;
+  width: 100%;
+}
+.option-item:hover{ background: var(--blue); }
+.option-item.selected{
+  border-color: var(--sage-dark);
+  background: #F3F8F1;
+}
+
+/* =========================================================
+   6. Result page
+   ========================================================= */
+.result-card{ text-align: center; }
+.result-score-circle{
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  margin: 0 auto 18px;
+  background: linear-gradient(135deg, var(--sage), var(--blue-dark));
+  color: var(--white);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  font-family: var(--font-display);
+  box-shadow: var(--shadow-soft-lg);
+}
+#result-score-number{ font-size: 40px; font-weight: 700; }
+.score-max{ font-size: 14px; opacity: 0.85; }
+
+.result-category{
+  font-size: 20px;
+  margin-bottom: 12px;
+  color: var(--sage-dark);
+}
+.result-explanation{ font-size: 14.5px; margin-bottom: 20px; }
+
+.result-crisis{
+  background: #FDECE7;
+  border: 1px solid var(--peach);
+  color: #8A4A36;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 13.5px;
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.result-recommend{ text-align: left; }
+.result-recommend h4{ font-size: 15px; margin-bottom: 10px; }
+.result-recommend ul{ padding-left: 20px; }
+.result-recommend li{ font-size: 14px; color: var(--gray-soft); margin-bottom: 6px; }
+
+.result-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: center;
+}
+
+/* =========================================================
+   7. Chatbot
+   ========================================================= */
+.chat-card{ padding: 0; overflow: hidden; display: flex; flex-direction: column; height: 480px; }
+.chat-window{
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--cream-soft);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Ccircle cx='20' cy='30' r='3' fill='%23A8C3A0' fill-opacity='0.18'/%3E%3Ccircle cx='122' cy='58' r='4' fill='%23BFD7EA' fill-opacity='0.18'/%3E%3Ccircle cx='70' cy='118' r='3' fill='%23F7B7A3' fill-opacity='0.18'/%3E%3Ccircle cx='138' cy='138' r='2.5' fill='%23A8C3A0' fill-opacity='0.15'/%3E%3Ccircle cx='32' cy='100' r='2.5' fill='%23BFD7EA' fill-opacity='0.15'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 160px 160px;
+}
+.bubble{
+  max-width: 78%;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.bubble-bot{
+  align-self: flex-start;
+  background: var(--blue);
+  color: var(--gray);
+  border-bottom-left-radius: 4px;
+}
+.bubble-user{
+  align-self: flex-end;
+  background: var(--sage);
+  color: var(--white);
+  border-bottom-right-radius: 4px;
+}
+
+.bubble-typing{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 18px;
+}
+.bubble-typing span{
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gray-soft);
+  opacity: 0.6;
+  animation: typingDot 1.2s infinite ease-in-out;
+}
+.bubble-typing span:nth-child(2){ animation-delay: 0.15s; }
+.bubble-typing span:nth-child(3){ animation-delay: 0.3s; }
+@keyframes typingDot{
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 0.9; }
+}
+
+.chat-input-row{
+  display: flex;
+  gap: 10px;
+  padding: 16px;
+  background: var(--white);
+  border-top: 1px solid #F0EAE0;
+}
+#chat-input{
+  flex: 1;
+  border: 1.5px solid #E7E0D3;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 14.5px;
+  color: var(--gray);
+}
+#chat-input:focus{ border-color: var(--sage-dark); outline: none; }
+.chat-send-btn{ padding: 12px 24px; }
+.chat-disclaimer{ text-align: center; font-size: 12px; margin-top: 14px; color: #9A9A9A; }
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+@media (max-width: 640px){
+  body{ background-attachment: scroll, scroll, scroll; }
+  .brand-title{ font-size: 36px; }
+  .breathing-orb{ width: 110px; height: 110px; }
+  .mood-grid{ grid-template-columns: repeat(2, 1fr); }
+  .nav-links{ gap: 2px; }
+  .nav-link{ padding: 7px 10px; font-size: 12.5px; }
+  .card{ padding: 22px; }
+  .chat-card{ height: 420px; }
+  .dashboard-actions{ flex-direction: column; }
+  .dashboard-actions .btn{ width: 100%; }
+  .result-actions{ flex-direction: column; }
+  .result-actions .btn{ width: 100%; }
+  .calm-illustration{ max-height: 120px; }
+}
+
+@media (max-width: 380px){
+  .mood-grid{ grid-template-columns: repeat(2, 1fr); }
+  .brand-title{ font-size: 32px; }
+}
