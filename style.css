@@ -326,9 +326,20 @@ input{ font-family: var(--font-body); }
 .checkin-mismatch{
   margin-top: 18px;
   padding: 16px 18px;
-  background: #FBF3E8;
-  border: 1px solid var(--peach);
   border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.checkin-mismatch.tone-positive{
+  background: #F1F7EE;
+  border-color: var(--sage);
+}
+.checkin-mismatch.tone-neutral{
+  background: #EFF5F9;
+  border-color: var(--blue-dark);
+}
+.checkin-mismatch.tone-concern{
+  background: #FBF3E8;
+  border-color: var(--peach);
 }
 .mismatch-title{
   font-family: var(--font-display);
