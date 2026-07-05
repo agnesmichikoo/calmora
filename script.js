@@ -378,47 +378,43 @@
   function getMismatchNote(mood, categoryName) {
     const valence = getMoodValence(mood);
     const concern = getConcernLevel(categoryName);
+    const opener = 'Terima kasih sudah jujur dengan apa yang kamu rasakan.';
+    const invite = 'Kalau kamu mau, Calmora siap menemanimu memahami perasaanmu, pelan-pelan.';
 
     if (valence === 'positive' && concern === 'low') {
       return {
         tone: 'positive',
-        title: 'Mood dan hasilmu sejalan',
-        text: `Kamu memilih mood "${mood}" dan hasil skrining kesehatan mental menunjukkan kondisi psikologis yang baik. Sepertinya kondisimu memang cukup stabil hari ini — pertahankan kebiasaan baik yang udah kamu jalani.`,
+        text: `${opener}\n\nKamu memilih mood "${mood}", dan hasil screening juga menunjukkan kondisi psikologis yang baik — keduanya sejalan.\n\nPertahankan kebiasaan baik yang udah kamu jalani ya.`,
       };
     }
     if (valence === 'positive' && concern === 'high') {
       return {
         tone: 'concern',
-        title: 'Sepertinya ada yang tidak sejalan',
-        text: `Kamu memilih mood "${mood}", tapi hasil skrining kesehatan mental menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih. Ini bisa saja terjadi — kadang kita tetap terlihat baik-baik saja di luar, walau ada beban yang tersimpan di dalam. Nggak apa-apa kalau perasaanmu memang sekompleks ini.`,
+        text: `${opener}\n\nMeski kamu memilih mood "${mood}", hasil screening menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih.\n\n${invite}`,
       };
     }
     if (valence === 'neutral' && concern === 'low') {
       return {
         tone: 'positive',
-        title: 'Sepertinya cukup stabil',
-        text: `Kamu memilih mood "Biasa" dan hasil skrining kesehatan mental menunjukkan kondisi psikologis yang baik. Harimu sepertinya berjalan cukup netral dan stabil.`,
+        text: `${opener}\n\nKamu memilih mood "Biasa", dan hasil screening menunjukkan kondisi psikologis yang baik. Harimu sepertinya berjalan cukup stabil.\n\nTetap semangat menjalani hari-harimu ya.`,
       };
     }
     if (valence === 'neutral' && concern === 'high') {
       return {
         tone: 'concern',
-        title: 'Ada yang perlu diperhatikan',
-        text: `Kamu memilih mood "Biasa", tapi hasil skrining kesehatan mental menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih. Kadang kita nggak selalu sadar penuh sama beban yang lagi dirasain. Coba cek rekomendasi self-care di halaman hasil ya.`,
+        text: `${opener}\n\nMeski kamu memilih mood "Biasa", hasil screening menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih.\n\n${invite}`,
       };
     }
     if (valence === 'negative' && concern === 'low') {
       return {
         tone: 'neutral',
-        title: 'Sedikit catatan',
-        text: `Kamu memilih mood "${mood}", tapi hasil skrining kesehatan mental menunjukkan kondisi psikologis yang masih baik. Perasaan itu nggak selalu sejalan langsung dengan hasil skrining, dan itu wajar.`,
+        text: `${opener}\n\nMeski kamu memilih mood "${mood}", hasil screening menunjukkan kondisi psikologis yang masih baik. Perasaan itu nggak selalu sejalan langsung dengan hasil skrining, dan itu wajar.\n\nKalau kamu mau cerita lebih lanjut, Calmora siap mendengarkan.`,
       };
     }
     // negative && high — mood dan hasil sama-sama menunjukkan ada yang berat
     return {
       tone: 'concern',
-      title: 'Hasil ini sejalan dengan perasaanmu',
-      text: `Kamu memilih mood "${mood}", dan hasil skrining kesehatan mental menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih. Wajar kalau kondisi ini terasa berat — coba lihat rekomendasi self-care di halaman hasil, dan ingat kamu nggak harus menghadapinya sendirian.`,
+      text: `${opener}\n\nKamu memilih mood "${mood}", dan hasil screening juga menunjukkan kondisi psikologis yang perlu mendapat perhatian lebih.\n\n${invite}`,
     };
   }
 
@@ -447,7 +443,6 @@
       $('#ci-category').textContent = data.category;
 
       const mismatch = getMismatchNote(data.mood, data.category);
-      $('#mismatch-title').textContent = mismatch.title;
       $('#mismatch-text').textContent = mismatch.text;
       mismatchEl.classList.remove('hidden', 'tone-positive', 'tone-neutral', 'tone-concern');
       mismatchEl.classList.add(`tone-${mismatch.tone}`);
