@@ -30,11 +30,19 @@ html{ scroll-behavior: smooth; }
 
 body{
   font-family: var(--font-body);
-  background: var(--cream);
   color: var(--gray);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  background-color: var(--cream);
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(168, 195, 160, 0.28) 0%, transparent 42%),
+    radial-gradient(circle at 92% 8%, rgba(191, 215, 234, 0.32) 0%, transparent 38%),
+    radial-gradient(circle at 12% 88%, rgba(247, 183, 163, 0.24) 0%, transparent 40%),
+    radial-gradient(circle at 88% 92%, rgba(168, 195, 160, 0.22) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(191, 215, 234, 0.12) 0%, transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 h1,h2,h3,h4{
@@ -541,6 +549,7 @@ input{ font-family: var(--font-body); }
    Responsive
    ========================================================= */
 @media (max-width: 640px){
+  body{ background-attachment: scroll; }
   .brand-title{ font-size: 36px; }
   .breathing-orb{ width: 110px; height: 110px; }
   .mood-grid{ grid-template-columns: repeat(2, 1fr); }
