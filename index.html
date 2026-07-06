@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calmora — Teman Digital untuk Ketenangan Hatimu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="logo-bar">
+  <img src="logo-binus.png" alt="BINUS University - Faculty of Humanities - Digital Psychology" class="site-logo">
+</div>
+
+<!-- ===================== NAVBAR (muncul setelah onboarding) ===================== -->
+<nav class="navbar hidden" id="navbar">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <span class="orb-mini"></span>
+      <span>Calmora</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-link active" data-target="dashboard-page">Dashboard</button>
+      <button class="nav-link" data-target="mood-page">Check-in</button>
+      <button class="nav-link" data-target="chat-page">Calmora</button>
+    </div>
+  </div>
+</nav>
+
+<main id="app">
+
+  <!-- ===================== 1. LANDING PAGE ===================== -->
+  <section class="page active landing" id="landing-page">
+    <div class="landing-inner">
+      <div class="breathing-orb" aria-hidden="true"></div>
+      <p class="eyebrow">teman digital untuk kesejahteraanmu</p>
+      <h1 class="brand-title">Calmora</h1>
+      <p class="tagline">Ruang tenang untuk mengenali perasaanmu, satu tarikan napas pada satu waktu.</p>
+      <button class="btn btn-primary" id="start-btn">Mulai Sekarang</button>
+      <p class="landing-footnote">Tidak butuh akun. Semua data tersimpan hanya di perangkatmu.</p>
+    </div>
+  </section>
+
+  <!-- ===================== 2. DISCLAIMER PAGE ===================== -->
+  <section class="page disclaimer" id="disclaimer-page">
+    <div class="card disclaimer-card">
+      <span class="tag-pill">Sebelum lanjut</span>
+      <h2>Ini penting untuk dibaca dulu, ya.</h2>
+      <p class="disclaimer-text">
+        Calmora <strong>bukan alat diagnosis medis</strong> dan bukan pengganti psikolog, psikiater,
+        atau tenaga profesional kesehatan mental. Fitur mood check-in dan skrining kesehatan mental di sini
+        hanya membantumu mengenali dan merefleksikan perasaan sehari-hari secara ringan.
+      </p>
+      <p class="disclaimer-text">
+        Jika kamu merasa kondisimu berat, berkelanjutan, atau mengganggu keseharian, sangat disarankan
+        untuk berbicara dengan orang terpercaya atau tenaga profesional kesehatan mental.
+      </p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="agree-checkbox">
+        <span>Saya mengerti Calmora bukan alat diagnosis, dan tetap ingin melanjutkan.</span>
+      </label>
+      <button class="btn btn-primary" id="continue-btn" disabled>Lanjutkan</button>
+    </div>
+  </section>
+
+  <!-- ===================== 3. DASHBOARD PAGE ===================== -->
+  <section class="page" id="dashboard-page">
+    <div class="page-inner">
+      <svg class="calm-illustration" viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="800" height="220" rx="28" fill="#FFFDFB"></rect>
+        <circle cx="650" cy="66" r="42" fill="#F7B7A3" opacity="0.85"></circle>
+        <circle cx="120" cy="55" r="13" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="158" cy="46" r="17" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="198" cy="58" r="11" fill="#FFFFFF" opacity="0.7"></circle>
+        <circle cx="500" cy="40" r="10" fill="#FFFFFF" opacity="0.55"></circle>
+        <circle cx="530" cy="34" r="14" fill="#FFFFFF" opacity="0.55"></circle>
+        <path d="M0 165 Q 150 105 300 155 T 800 145 V220 H0 Z" fill="#BFD7EA" opacity="0.55"></path>
+        <path d="M0 195 Q 200 145 420 185 T 800 175 V220 H0 Z" fill="#A8C3A0" opacity="0.85"></path>
+      </svg>
+
+      <header class="page-header">
+        <p class="eyebrow">dashboard</p>
+        <h2>Halo, senang kamu di sini 🌿</h2>
+        <p class="subtext">Begini kondisi terakhirmu yang tercatat di Calmora.</p>
+      </header>
+
+      <div class="card checkin-card" id="last-checkin-card">
+        <span class="tag-pill">Last Check-In</span>
+        <div class="checkin-empty" id="checkin-empty">
+          <p>Kamu belum melakukan check-in apa pun. Yuk mulai yang pertama.</p>
+        </div>
+        <div class="checkin-filled hidden" id="checkin-filled">
+          <div class="checkin-top">
+            <span class="checkin-emoji" id="ci-mood-emoji">🙂</span>
+            <div>
+              <p class="checkin-mood-label" id="ci-mood-label">Baik</p>
+              <p class="checkin-date" id="ci-date">—</p>
+            </div>
+          </div>
+          <div class="checkin-score-row">
+            <div class="score-badge" id="ci-score-badge">0</div>
+            <div>
+              <p class="checkin-category" id="ci-category">Baik</p>
+              <p class="checkin-sub">dari skor skrining kesehatan mental terakhir</p>
+            </div>
+          </div>
+
+          <div class="checkin-mismatch hidden" id="checkin-mismatch">
+            <div class="mismatch-text" id="mismatch-text"></div>
+            <button class="btn btn-secondary mismatch-btn" id="mismatch-chat-btn">Ngobrol dengan Calmora</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-actions">
+        <button class="btn btn-primary" id="dash-checkin-btn">Mulai Check-in Baru</button>
+        <button class="btn btn-secondary" id="dash-chat-btn">Ngobrol dengan Calmora</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 4. MOOD CHECK-IN PAGE ===================== -->
+  <section class="page" id="mood-page">
+    <div class="page-inner narrow">
+      <header class="page-header">
+        <p class="eyebrow">langkah 1 dari 2</p>
+        <h2>Gimana perasaanmu hari ini?</h2>
+        <p class="subtext">Pilih emoji yang paling menggambarkan suasana hatimu saat ini.</p>
+      </header>
+
+      <div class="mood-grid" id="mood-grid">
+        <button class="mood-option" data-mood="Senang" data-emoji="😄">
+          <span class="mood-emoji">😄</span><span>Senang</span>
+        </button>
+        <button class="mood-option" data-mood="Baik" data-emoji="🙂">
+          <span class="mood-emoji">🙂</span><span>Baik</span>
+        </button>
+        <button class="mood-option" data-mood="Biasa" data-emoji="😐">
+          <span class="mood-emoji">😐</span><span>Biasa</span>
+        </button>
+        <button class="mood-option" data-mood="Sedih" data-emoji="😔">
+          <span class="mood-emoji">😔</span><span>Sedih</span>
+        </button>
+        <button class="mood-option" data-mood="Cemas" data-emoji="😣">
+          <span class="mood-emoji">😣</span><span>Cemas</span>
+        </button>
+        <button class="mood-option" data-mood="Lelah" data-emoji="😴">
+          <span class="mood-emoji">😴</span><span>Lelah</span>
+        </button>
+      </div>
+
+      <button class="btn btn-primary" id="mood-next-btn" disabled>Lanjut ke Screening</button>
+    </div>
+  </section>
+
+  <!-- ===================== 5. GENERAL MENTAL HEALTH SCREENING PAGE ===================== -->
+  <section class="page" id="screening-page">
+    <div class="page-inner narrow">
+      <header class="page-header">
+        <p class="eyebrow">langkah 2 dari 2</p>
+        <h2>Skrining Kesehatan Mental</h2>
+        <p class="subtext">Belakangan ini, seberapa sering kamu mengalami hal-hal berikut?</p>
+      </header>
+
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <p class="progress-label" id="progress-label">Pertanyaan 1 dari 12</p>
+
+      <div class="card question-card">
+        <p class="question-text" id="question-text">—</p>
+        <div class="option-list" id="option-list"></div>
+      </div>
+
+      <button class="btn btn-ghost" id="question-back-btn">← Kembali</button>
+    </div>
+  </section>
+
+  <!-- ===================== 6. RESULT PAGE ===================== -->
+  <section class="page" id="result-page">
+    <div class="page-inner narrow">
+      <header class="page-header">
+        <p class="eyebrow">hasil screening</p>
+        <h2>Ini gambaran kondisimu</h2>
+      </header>
+
+      <div class="card result-card">
+        <div class="result-score-circle" id="result-score-circle">
+          <span id="result-score-number">0</span>
+          <span class="score-max">/36</span>
+        </div>
+        <h3 class="result-category" id="result-category">Baik</h3>
+        <p class="result-explanation" id="result-explanation">—</p>
+
+        <div class="result-crisis hidden" id="result-crisis">
+          <strong>Catatan penting:</strong> Pertimbangkan untuk menghubungi orang terpercaya atau tenaga profesional jika perasaan ini terasa berat untuk dijalani sendiri.
+        </div>
+
+        <div class="result-recommend">
+          <h4>Rekomendasi self-care ringan</h4>
+          <ul id="result-recommend-list"></ul>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-primary" id="result-dashboard-btn">Kembali ke Dashboard</button>
+        <button class="btn btn-secondary" id="result-chat-btn">Ngobrol dengan Calmora</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 7. CHATBOT PAGE ===================== -->
+  <section class="page" id="chat-page">
+    <div class="page-inner narrow">
+      <header class="page-header">
+        <p class="eyebrow">calmora</p>
+        <h2>Ngobrol Santai</h2>
+        <p class="subtext">Ceritakan saja apa yang kamu rasakan ke Calmora, Calmora di sini untuk mendengarkan.</p>
+      </header>
+
+      <div class="card chat-card">
+        <div class="chat-window" id="chat-window"></div>
+        <form class="chat-input-row" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Tulis perasaanmu di sini..." autocomplete="off">
+          <button type="submit" class="btn btn-primary chat-send-btn">Kirim</button>
+        </form>
+      </div>
+      <p class="chat-disclaimer">Calmora ini adalah simulasi sederhana, bukan terapis sungguhan.</p>
+    </div>
+  </section>
+
+</main>
+
+<div class="corner-credit">
+  <p>Agnes Michiko Rahayu Tirta</p>
+  <p>Syafira Aidah Zalfa</p>
+  <p>BINUS – Digital Psychology</p>
+  <p>B2029</p>
+  <p>BINUS @Malang</p>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
