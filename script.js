@@ -779,6 +779,53 @@
     return reply;
   }
 
+  /* ---------------------------------------------------------
+     VOICE INPUT (mic) — pakai Web Speech API bawaan browser.
+     Tidak butuh API key. Hanya berfungsi di browser yang
+     mendukung SpeechRecognition (mis. Chrome/Edge desktop &
+     Android). Kalau tidak didukung, tombol mic dinonaktifkan.
+     --------------------------------------------------------- */
+  const micBtn = $('#mic-btn');
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (SpeechRecognitionAPI && micBtn) {
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'id-ID';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    let isRecording = false;
+
+    recognition.addEventListener('result', (e) => {
+      const transcript = e.results[0][0].transcript;
+      chatInput.value = chatInput.value ? `${chatInput.value} ${transcript}` : transcript;
+      chatInput.focus();
+    });
+
+    recognition.addEventListener('end', () => {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+    });
+
+    recognition.addEventListener('error', () => {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+    });
+
+    micBtn.addEventListener('click', () => {
+      if (isRecording) {
+        recognition.stop();
+        return;
+      }
+      isRecording = true;
+      micBtn.classList.add('recording');
+      recognition.start();
+    });
+  } else if (micBtn) {
+    // Browser tidak mendukung voice input — nonaktifkan tombol
+    micBtn.disabled = true;
+    micBtn.title = 'Voice input tidak didukung di browser ini';
+  }
+
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const value = chatInput.value.trim();
