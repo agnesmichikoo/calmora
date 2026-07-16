@@ -826,6 +826,47 @@
     micBtn.title = 'Voice input tidak didukung di browser ini';
   }
 
+  /* ---------------------------------------------------------
+     KONEKSI KE AI ASLI (Cloudflare Worker → Gemini API)
+     Kalau gagal/timeout, otomatis fallback ke sistem chatbot lokal
+     (getBotResponse) supaya chat tidak pernah "mati total".
+     --------------------------------------------------------- */
+  const AI_WORKER_URL = 'https://calmora-companion.agnesmichikoo.workers.dev';
+  const aiConversationHistory = []; // {role: 'user'|'assistant', content: string}
+  const MAX_HISTORY_TURNS = 8; // batasi konteks biar hemat kuota
+
+  async function getAIResponse(userText) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      const res = await fetch(AI_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userText,
+          history: aiConversationHistory.slice(-MAX_HISTORY_TURNS),
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error('AI backend error');
+
+      const data = await res.json();
+      if (!data.reply) throw new Error('Balasan kosong dari AI');
+
+      aiConversationHistory.push({ role: 'user', content: userText });
+      aiConversationHistory.push({ role: 'assistant', content: data.reply });
+
+      return data.reply;
+    } catch (err) {
+      // Fallback diam-diam ke sistem lokal — user tidak lihat error apa pun
+      return getBotResponse(userText);
+    }
+  }
+
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const value = chatInput.value.trim();
@@ -835,12 +876,11 @@
     chatInput.value = '';
 
     const typingBubble = showTypingIndicator();
-    const thinkTime = 500 + Math.random() * 500;
 
-    setTimeout(() => {
+    getAIResponse(value).then((reply) => {
       typingBubble.remove();
-      addBubble(getBotResponse(value), 'bot');
-    }, thinkTime);
+      addBubble(reply, 'bot');
+    });
   });
 
   // Greet the first time the chat page becomes visible
