@@ -780,48 +780,115 @@
   }
 
   /* ---------------------------------------------------------
-     VOICE INPUT (mic) — pakai Web Speech API bawaan browser.
-     Tidak butuh API key. Hanya berfungsi di browser yang
-     mendukung SpeechRecognition (mis. Chrome/Edge desktop &
-     Android). Kalau tidak didukung, tombol mic dinonaktifkan.
+     VOICE INPUT (mic) — rekam audio pakai MediaRecorder (didukung
+     semua browser modern termasuk Safari), lalu kirim ke Worker buat
+     ditranskrip jadi teks pakai Gemini. Ini menggantikan pendekatan
+     lama (Web Speech API) yang tidak jalan di Safari.
      --------------------------------------------------------- */
   const micBtn = $('#mic-btn');
-  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecordAudio = !!(navigator.mediaDevices && window.MediaRecorder);
 
-  if (SpeechRecognitionAPI && micBtn) {
-    const recognition = new SpeechRecognitionAPI();
-    recognition.lang = 'id-ID';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+  if (canRecordAudio && micBtn) {
+    let mediaRecorder = null;
+    let audioChunks = [];
     let isRecording = false;
+    let isProcessing = false;
 
-    recognition.addEventListener('result', (e) => {
-      const transcript = e.results[0][0].transcript;
-      chatInput.value = chatInput.value ? `${chatInput.value} ${transcript}` : transcript;
-      chatInput.focus();
-    });
+    const MIME_CANDIDATES = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+    ];
+    const chosenMimeType =
+      MIME_CANDIDATES.find((t) => window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
 
-    recognition.addEventListener('end', () => {
-      isRecording = false;
-      micBtn.classList.remove('recording');
-    });
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
 
-    recognition.addEventListener('error', () => {
-      isRecording = false;
-      micBtn.classList.remove('recording');
-    });
+    async function transcribeAudio(blob) {
+      const base64 = await blobToBase64(blob);
+      const res = await fetch(AI_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: base64,
+          mimeType: blob.type || chosenMimeType || 'audio/webm',
+        }),
+      });
+      if (!res.ok) throw new Error('Gagal transkripsi audio');
+      const data = await res.json();
+      return (data.transcript || '').trim();
+    }
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = chosenMimeType
+          ? new MediaRecorder(stream, { mimeType: chosenMimeType })
+          : new MediaRecorder(stream);
+
+        mediaRecorder.addEventListener('dataavailable', (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        });
+
+        mediaRecorder.addEventListener('stop', async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          isRecording = false;
+          micBtn.classList.remove('recording');
+
+          if (audioChunks.length === 0) return;
+
+          isProcessing = true;
+          micBtn.classList.add('processing');
+          micBtn.disabled = true;
+
+          try {
+            const blob = new Blob(audioChunks, { type: chosenMimeType || 'audio/webm' });
+            const transcript = await transcribeAudio(blob);
+            if (transcript) {
+              chatInput.value = chatInput.value ? `${chatInput.value} ${transcript}` : transcript;
+              chatInput.focus();
+            }
+          } catch (err) {
+            console.error('[Calmora Voice] Gagal transkrip:', err);
+          } finally {
+            isProcessing = false;
+            micBtn.classList.remove('processing');
+            micBtn.disabled = false;
+          }
+        });
+
+        mediaRecorder.start();
+        isRecording = true;
+        micBtn.classList.add('recording');
+      } catch (err) {
+        console.error('[Calmora Voice] Tidak bisa akses mikrofon:', err);
+        micBtn.classList.remove('recording');
+      }
+    }
 
     micBtn.addEventListener('click', () => {
+      if (isProcessing) return;
       if (isRecording) {
-        recognition.stop();
-        return;
+        mediaRecorder.stop();
+      } else {
+        startRecording();
       }
-      isRecording = true;
-      micBtn.classList.add('recording');
-      recognition.start();
     });
   } else if (micBtn) {
-    // Browser tidak mendukung voice input — nonaktifkan tombol
+    // Browser tidak mendukung rekam audio sama sekali — nonaktifkan tombol
     micBtn.disabled = true;
     micBtn.title = 'Voice input tidak didukung di browser ini';
   }
@@ -838,7 +905,7 @@
   async function getAIResponse(userText) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
+      const timeout = setTimeout(() => controller.abort(), 25000);
 
       const res = await fetch(AI_WORKER_URL, {
         method: 'POST',
@@ -852,7 +919,10 @@
 
       clearTimeout(timeout);
 
-      if (!res.ok) throw new Error('AI backend error');
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`AI backend error (${res.status}): ${errText}`);
+      }
 
       const data = await res.json();
       if (!data.reply) throw new Error('Balasan kosong dari AI');
@@ -862,7 +932,8 @@
 
       return data.reply;
     } catch (err) {
-      // Fallback diam-diam ke sistem lokal — user tidak lihat error apa pun
+      // DEBUG: tampilkan error asli di console biar kelihatan kenapa fallback
+      console.error('[Calmora AI] Fallback ke sistem lokal karena:', err);
       return getBotResponse(userText);
     }
   }
