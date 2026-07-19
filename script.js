@@ -262,44 +262,22 @@
 
   // Fallback reflektif kalau tidak ada kata kunci yang cocok —
   // dipecah jadi dua bagian lalu dikombinasikan biar variasinya banyak.
+  // Sengaja dibuat netral supaya tetap masuk akal walau user ngetik apa pun.
   const REFLECTIVE_OPENERS = [
-    'Oke, aku denger ceritamu.',
-    'Makasih udah mau cerita ini.',
-    'Kedengerannya ini penting banget buat kamu.',
-    'Aku appreciate banget kamu mau share ini.',
-    'Wah, makasih udah percaya cerita ini ke aku.',
+    'Oke, aku dengerin kok.',
+    'Makasih udah cerita ke aku.',
+    'Aku di sini nemenin kamu.',
+    'Hmm, aku denger kamu.',
+    'Boleh banget cerita ke aku.',
+    'Aku ada di sini buat kamu.',
   ];
   const REFLECTIVE_QUESTIONS = [
-    'Mau lanjut cerita lebih detail?',
-    'Kira-kira gimana perasaanmu soal itu sekarang?',
-    'Ada bagian yang paling berat dari itu?',
-    'Biasanya apa sih yang bikin kamu ngerasa mendingan kalau kayak gini?',
-    'Cerita aja lebih lanjut, aku dengerin kok.',
-    'Boleh diceritain lebih detail, aku dengerin kok.',
-  ];
-
-  // Kata-kata fungsi yang diabaikan saat menangkap "topik" dari kalimat user,
-  // supaya kata yang tersisa lebih mungkin berupa hal spesifik yang diceritakan
-  // (misal: "kerjaan", "ujian", "pacar", "keluarga") bukan kata sambung/ganti.
-  const STOPWORDS = [
-    'yang', 'di', 'ke', 'dari', 'dan', 'atau', 'aku', 'kamu', 'ini', 'itu', 'saya', 'dia',
-    'mereka', 'kita', 'ada', 'juga', 'sudah', 'udah', 'belum', 'akan', 'sedang', 'lagi',
-    'banget', 'sih', 'deh', 'dong', 'nih', 'kok', 'ya', 'gak', 'ga', 'nggak', 'enggak',
-    'tidak', 'bukan', 'karena', 'kalau', 'kalo', 'tapi', 'tetapi', 'sama', 'dengan', 'untuk',
-    'buat', 'biar', 'supaya', 'jadi', 'terus', 'trus', 'aja', 'saja', 'mau', 'pengen',
-    'harus', 'bisa', 'dapat', 'masih', 'sekarang', 'hari', 'tuh', 'gitu', 'gini', 'sangat',
-    'lebih', 'paling', 'pun', 'pada', 'oleh', 'saat', 'waktu', 'ketika', 'begitu', 'begini',
-    'satu', 'dua', 'tiga', 'orang', 'nya', 'ku', 'mu', 'apa', 'gimana', 'kenapa', 'akhir',
-  ];
-
-  // Template respons yang menyisipkan kembali "topik" dari kalimat user,
-  // supaya kelihatan lebih nyambung ke isi cerita, bukan cuma template kosong.
-  const TOPIC_OPENERS = [
-    'Soal {topic} ini kedengarannya lumayan berat ya buat kamu.',
-    'Aku denger kamu lagi mikirin {topic}.',
-    'Hmm, {topic} ya. Kedengarannya ini beneran ngefek ke kamu.',
-    'Makasih udah cerita soal {topic} ke aku.',
-    'Jadi ini soal {topic} ya. Aku dengerin kok.',
+    'Gimana perasaanmu hari ini?',
+    'Ada yang lagi kamu rasain dan pengen diceritain?',
+    'Lagi ada di pikiranmu apa nih?',
+    'Cerita aja pelan-pelan, aku dengerin.',
+    'Mau cerita lebih lanjut soal harimu?',
+    'Ada yang bisa aku bantu dengerin hari ini?',
   ];
 
   /* ---------------------------------------------------------
@@ -681,32 +659,6 @@
     return null;
   }
 
-  // Ambil kata-kata "isi" dari kalimat user (bukan kata sambung/kata kunci
-  // emosi yang sudah ditangani terpisah), buat disisipkan balik ke jawaban
-  // supaya bot kelihatan menyimak isi cerita, bukan cuma pola generik.
-  const ALL_KNOWN_PATTERNS = [
-    ...EMOTION_CATEGORIES.flatMap((c) => c.keywords),
-    ...GREETING_PATTERNS,
-    ...SHORT_REPLY_PATTERNS,
-    ...CLOSING_PATTERNS,
-    ...INVITATION_PATTERNS,
-  ];
-
-  function extractTopic(text) {
-    const words = text
-      .replace(/[^\p{L}\p{N}\s-]/gu, '')
-      .split(/\s+/)
-      .filter(Boolean);
-
-    const contentWords = words.filter((w) => {
-      const lw = w.toLowerCase();
-      return lw.length >= 3 && !STOPWORDS.includes(lw) && !ALL_KNOWN_PATTERNS.includes(lw);
-    });
-
-    if (contentWords.length === 0) return null;
-    return contentWords.slice(0, 3).join(' ');
-  }
-
   function getBotResponse(userTextRaw) {
     const text = userTextRaw.toLowerCase().trim();
     chatMemory.turnCount++;
@@ -736,18 +688,13 @@
     const category = matchEmotionCategory(text);
     if (category) {
       const sameTopicAsBefore = chatMemory.lastTopic === category.name;
-      const topic = extractTopic(text);
       let reply;
       if (sameTopicAsBefore && Math.random() < 0.6) {
         reply = pickFromBag(category.followups);
       } else {
         const base = pickFromBag(category.responses);
-        if (topic && Math.random() < 0.4) {
-          reply = `${base} Kalau boleh tau, ini soal ${topic}, ya?`;
-        } else {
-          const addFollowup = category.followups && Math.random() < 0.45;
-          reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
-        }
+        const addFollowup = category.followups && Math.random() < 0.45;
+        reply = addFollowup ? `${base} ${pickFromBag(category.followups)}` : base;
       }
       chatMemory.lastTopic = category.name;
       return reply;
@@ -763,181 +710,65 @@
     }
 
     // 6. Fallback reflektif (tidak ada pola yang cocok sama sekali).
-    // Kalau ada kata "isi" yang bisa ditangkap dari kalimat user, sisipkan
-    // balik ke jawaban supaya kelihatan menyesuaikan cerita, bukan generik.
-    const topic = extractTopic(text);
+    // Pakai respons netral yang selalu masuk akal, tanpa maksa menyisipkan
+    // "topik" dari kalimat user — supaya kalau user ngetik ngasal/random,
+    // jawabannya tetap lembut dan tidak terlihat aneh.
+    const opener = pickFromBag(REFLECTIVE_OPENERS);
     const question = pickFromBag(REFLECTIVE_QUESTIONS);
-    let reply;
-    if (topic) {
-      const template = pickFromBag(TOPIC_OPENERS);
-      reply = `${template.replace('{topic}', topic)} ${question}`;
-    } else {
-      const opener = pickFromBag(REFLECTIVE_OPENERS);
-      reply = `${opener} ${question}`;
-    }
+    const reply = `${opener} ${question}`;
     chatMemory.lastTopic = 'general';
     return reply;
   }
 
   /* ---------------------------------------------------------
-     VOICE INPUT (mic) — rekam audio pakai MediaRecorder (didukung
-     semua browser modern termasuk Safari), lalu kirim ke Worker buat
-     ditranskrip jadi teks pakai Gemini. Ini menggantikan pendekatan
-     lama (Web Speech API) yang tidak jalan di Safari.
+     VOICE INPUT (mic) — pakai Web Speech API bawaan browser.
+     Tidak butuh backend/API key. Berfungsi di browser yang
+     mendukung SpeechRecognition (mis. Chrome/Edge). Kalau tidak
+     didukung (mis. Safari), tombol mic otomatis dinonaktifkan.
      --------------------------------------------------------- */
   const micBtn = $('#mic-btn');
-  const canRecordAudio = !!(navigator.mediaDevices && window.MediaRecorder);
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (canRecordAudio && micBtn) {
-    let mediaRecorder = null;
-    let audioChunks = [];
+  if (SpeechRecognitionAPI && micBtn) {
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'id-ID';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
     let isRecording = false;
-    let isProcessing = false;
 
-    const MIME_CANDIDATES = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-    ];
-    const chosenMimeType =
-      MIME_CANDIDATES.find((t) => window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+    recognition.addEventListener('result', (e) => {
+      const transcript = e.results[0][0].transcript;
+      chatInput.value = chatInput.value ? `${chatInput.value} ${transcript}` : transcript;
+      chatInput.focus();
+    });
 
-    function blobToBase64(blob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const dataUrl = reader.result;
-          const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    }
+    recognition.addEventListener('end', () => {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+    });
 
-    async function transcribeAudio(blob) {
-      const base64 = await blobToBase64(blob);
-      const res = await fetch(AI_WORKER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audio: base64,
-          mimeType: blob.type || chosenMimeType || 'audio/webm',
-        }),
-      });
-      if (!res.ok) throw new Error('Gagal transkripsi audio');
-      const data = await res.json();
-      return (data.transcript || '').trim();
-    }
-
-    async function startRecording() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = chosenMimeType
-          ? new MediaRecorder(stream, { mimeType: chosenMimeType })
-          : new MediaRecorder(stream);
-
-        mediaRecorder.addEventListener('dataavailable', (e) => {
-          if (e.data.size > 0) audioChunks.push(e.data);
-        });
-
-        mediaRecorder.addEventListener('stop', async () => {
-          stream.getTracks().forEach((track) => track.stop());
-          isRecording = false;
-          micBtn.classList.remove('recording');
-
-          if (audioChunks.length === 0) return;
-
-          isProcessing = true;
-          micBtn.classList.add('processing');
-          micBtn.disabled = true;
-
-          try {
-            const blob = new Blob(audioChunks, { type: chosenMimeType || 'audio/webm' });
-            const transcript = await transcribeAudio(blob);
-            if (transcript) {
-              chatInput.value = chatInput.value ? `${chatInput.value} ${transcript}` : transcript;
-              chatInput.focus();
-            }
-          } catch (err) {
-            console.error('[Calmora Voice] Gagal transkrip:', err);
-          } finally {
-            isProcessing = false;
-            micBtn.classList.remove('processing');
-            micBtn.disabled = false;
-          }
-        });
-
-        mediaRecorder.start();
-        isRecording = true;
-        micBtn.classList.add('recording');
-      } catch (err) {
-        console.error('[Calmora Voice] Tidak bisa akses mikrofon:', err);
-        micBtn.classList.remove('recording');
-      }
-    }
+    recognition.addEventListener('error', () => {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+    });
 
     micBtn.addEventListener('click', () => {
-      if (isProcessing) return;
       if (isRecording) {
-        mediaRecorder.stop();
-      } else {
-        startRecording();
+        recognition.stop();
+        return;
       }
+      isRecording = true;
+      micBtn.classList.add('recording');
+      recognition.start();
     });
   } else if (micBtn) {
-    // Browser tidak mendukung rekam audio sama sekali — nonaktifkan tombol
     micBtn.disabled = true;
     micBtn.title = 'Voice input tidak didukung di browser ini';
   }
 
   /* ---------------------------------------------------------
-     KONEKSI KE AI ASLI (Cloudflare Worker → Gemini API)
-     Kalau gagal/timeout, otomatis fallback ke sistem chatbot lokal
-     (getBotResponse) supaya chat tidak pernah "mati total".
+     CHAT SUBMIT — pakai chatbot lokal (rule-based), tanpa backend.
      --------------------------------------------------------- */
-  const AI_WORKER_URL = 'https://calmora-companion.agnesmichikoo.workers.dev';
-  const aiConversationHistory = []; // {role: 'user'|'assistant', content: string}
-  const MAX_HISTORY_TURNS = 8; // batasi konteks biar hemat kuota
-
-  async function getAIResponse(userText) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
-
-      const res = await fetch(AI_WORKER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userText,
-          history: aiConversationHistory.slice(-MAX_HISTORY_TURNS),
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`AI backend error (${res.status}): ${errText}`);
-      }
-
-      const data = await res.json();
-      if (!data.reply) throw new Error('Balasan kosong dari AI');
-
-      aiConversationHistory.push({ role: 'user', content: userText });
-      aiConversationHistory.push({ role: 'assistant', content: data.reply });
-
-      return data.reply;
-    } catch (err) {
-      // DEBUG: tampilkan error asli di console biar kelihatan kenapa fallback
-      console.error('[Calmora AI] Fallback ke sistem lokal karena:', err);
-      return getBotResponse(userText);
-    }
-  }
-
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const value = chatInput.value.trim();
@@ -947,11 +778,12 @@
     chatInput.value = '';
 
     const typingBubble = showTypingIndicator();
+    const thinkTime = 500 + Math.random() * 500;
 
-    getAIResponse(value).then((reply) => {
+    setTimeout(() => {
       typingBubble.remove();
-      addBubble(reply, 'bot');
-    });
+      addBubble(getBotResponse(value), 'bot');
+    }, thinkTime);
   });
 
   // Greet the first time the chat page becomes visible
